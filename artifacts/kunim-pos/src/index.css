@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Nunito:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --gold: #f0c040;
+  --gold-dark: #c9961e;
+  --red: #E01010;
+  --bg: #0a0a0a;
+  --bg2: #111111;
+  --bg3: #1a1a1a;
+  --bg4: #222222;
+  --border: rgba(255,255,255,0.08);
+  --text: #ffffff;
+  --text2: rgba(255,255,255,0.6);
+  --text3: rgba(255,255,255,0.3);
+  --success: #22c55e;
+  --warning: #f59e0b;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Nunito', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { font-family: 'Syne', sans-serif; }
+button { cursor: pointer; font-family: 'Nunito', sans-serif; }
+input, select, textarea { font-family: 'Nunito', sans-serif; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 2px; }
+
+/* Print */
+@media print {
+  body > *:not(#thermalPrint) { display: none !important; }
+  #thermalPrint { display: block !important; position: fixed; top: 0; left: 0; width: 80mm; }
+}
+#thermalPrint { display: none; }
