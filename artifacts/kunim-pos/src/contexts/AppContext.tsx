@@ -49,6 +49,9 @@ interface AppContextType {
   selectedPayment: PaymentMethod;
   setSelectedPayment: (p: PaymentMethod) => void;
   loading: boolean;
+  shiftOrders: Order[];
+  shiftStartTime: Date;
+  clearShift: () => void;
   addToCart: (item: MenuItem) => void;
   updateQty: (id: string, delta: number) => void;
   processOrder: (customer: string, table: string) => Promise<Order | null>;
@@ -68,6 +71,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('Cash');
   const [loading, setLoading] = useState(true);
+  const [shiftOrders, setShiftOrders] = useState<Order[]>([]);
+  const [shiftStartTime, setShiftStartTime] = useState<Date>(new Date());
 
   const seed = useCallback(async () => {
     const cSnap = await getDocs(collection(db, 'cashiers'));
@@ -110,6 +115,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  const clearShift = useCallback(() => {
+    setShiftOrders([]);
+    setShiftStartTime(new Date());
+  }, []);
+
   const addToCart = useCallback((item: MenuItem) => {
     if (item.stock <= 0) return;
     setCart(prev => {
@@ -123,10 +133,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateQty = useCallback((id: string, delta: number) => {
-    setCart(prev => {
-      const updated = prev.map(c => c.id === id ? { ...c, qty: c.qty + delta } : c).filter(c => c.qty > 0);
-      return updated;
-    });
+    setCart(prev => prev.map(c => c.id === id ? { ...c, qty: c.qty + delta } : c).filter(c => c.qty > 0));
   }, []);
 
   const processOrder = useCallback(async (customer: string, table: string): Promise<Order | null> => {
@@ -143,7 +150,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       timestamp: serverTimestamp(),
       date: new Date().toISOString().split('T')[0],
     };
-    await addDoc(collection(db, 'orders'), order);
+    const ref = await addDoc(collection(db, 'orders'), order);
     for (const cartItem of cart) {
       const menuItem = menuItems.find(m => m.id === cartItem.id);
       if (menuItem) {
@@ -152,14 +159,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setMenuItems(prev => prev.map(m => m.id === cartItem.id ? { ...m, stock: newStock } : m));
       }
     }
+    const savedOrder: Order = { ...order, id: ref.id };
+    setShiftOrders(prev => [...prev, savedOrder]);
     setCart([]);
-    return { ...order, id: 'done' };
+    return savedOrder;
   }, [cart, currentCashier, selectedPayment, menuItems]);
+
+  // Reset shift timer when a cashier logs in
+  const handleSetCurrentCashier = useCallback((c: Cashier | null) => {
+    setCurrentCashier(c);
+    if (c) {
+      setShiftOrders([]);
+      setShiftStartTime(new Date());
+    }
+  }, []);
 
   return (
     <AppContext.Provider value={{
       screen, setScreen,
-      currentCashier, setCurrentCashier,
+      currentCashier, setCurrentCashier: handleSetCurrentCashier,
       isAdmin, setIsAdmin,
       adminCreds, setAdminCreds,
       cashiers, setCashiers,
@@ -168,6 +186,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cart, setCart,
       selectedPayment, setSelectedPayment,
       loading,
+      shiftOrders,
+      shiftStartTime,
+      clearShift,
       addToCart, updateQty, processOrder,
       refreshMenu,
     }}>

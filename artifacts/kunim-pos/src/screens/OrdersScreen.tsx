@@ -4,7 +4,11 @@ import { db } from '../lib/firebase';
 import TopNav from '../components/TopNav';
 import { Order } from '../lib/types';
 
-export default function OrdersScreen() {
+interface Props {
+  onEndShift: () => void;
+}
+
+export default function OrdersScreen({ onEndShift }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,7 +50,7 @@ export default function OrdersScreen() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <TopNav activeTab="orders" />
+      <TopNav activeTab="orders" onEndShift={onEndShift} />
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '18px' }}>
           {stats.map(s => (

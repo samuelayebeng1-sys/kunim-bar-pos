@@ -5,7 +5,11 @@ import TopNav from '../components/TopNav';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { Order } from '../lib/types';
 
-export default function ReportsScreen() {
+interface Props {
+  onEndShift: () => void;
+}
+
+export default function ReportsScreen({ onEndShift }: Props) {
   const today = new Date().toISOString().split('T')[0];
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
@@ -51,7 +55,7 @@ export default function ReportsScreen() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <TopNav activeTab="reports" />
+      <TopNav activeTab="reports" onEndShift={onEndShift} />
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
           <label style={{ fontSize: '12px', color: 'var(--text2)', fontWeight: 600 }}>From</label>

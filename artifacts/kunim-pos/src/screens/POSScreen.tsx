@@ -4,7 +4,11 @@ import TopNav from '../components/TopNav';
 import ReceiptModal from '../components/modals/ReceiptModal';
 import { Order } from '../lib/types';
 
-export default function POSScreen() {
+interface Props {
+  onEndShift: () => void;
+}
+
+export default function POSScreen({ onEndShift }: Props) {
   const { menuItems, categories, cart, addToCart, updateQty, selectedPayment, setSelectedPayment, processOrder } = useApp();
   const [searchQ, setSearchQ] = useState('');
   const [activeCat, setActiveCat] = useState('All');
@@ -34,7 +38,7 @@ export default function POSScreen() {
         setCustName('');
         setTableNum('');
       }
-    } catch (e) {
+    } catch {
       alert('Error saving order. Check your internet connection.');
     } finally {
       setCharging(false);
@@ -61,7 +65,7 @@ export default function POSScreen() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <TopNav activeTab="pos" />
+      <TopNav activeTab="pos" onEndShift={onEndShift} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', flex: 1, overflow: 'hidden', height: 'calc(100vh - 56px)' }}>
 
         {/* Menu Side */}
