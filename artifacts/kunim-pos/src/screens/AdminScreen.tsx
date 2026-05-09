@@ -295,6 +295,12 @@ export default function AdminScreen() {
   ].filter(d => d.value > 0);
   const repTopItems = Object.entries(repByItem).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
+  // Stock alert calcs
+  const outOfStock = menuItems.filter(m => m.stock <= 0);
+  const lowStock = menuItems.filter(m => m.stock > 0 && m.stock <= 5);
+  const alertItems = [...outOfStock, ...lowStock];
+  const alertCount = alertItems.length;
+
   const tabs: { id: AdminTab; label: string }[] = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'menu', label: 'Menu Items' },
@@ -316,8 +322,14 @@ export default function AdminScreen() {
       {/* Admin Nav */}
       <div style={{ display: 'flex', gap: '3px', padding: '10px 12px', background: 'var(--bg2)', borderBottom: '1px solid var(--border)', overflowX: 'auto', flexShrink: 0 }}>
         {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, border: 'none', background: tab === t.id ? 'rgba(224,16,16,.1)' : 'transparent', color: tab === t.id ? 'var(--red)' : 'var(--text2)', whiteSpace: 'nowrap', cursor: 'pointer', fontFamily: 'Syne, sans-serif' }}>
+          <button key={t.id} onClick={() => setTab(t.id)}
+            style={{ position: 'relative', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, border: 'none', background: tab === t.id ? 'rgba(224,16,16,.1)' : 'transparent', color: tab === t.id ? 'var(--red)' : 'var(--text2)', whiteSpace: 'nowrap', cursor: 'pointer', fontFamily: 'Syne, sans-serif' }}>
             {t.label}
+            {t.id === 'stock' && alertCount > 0 && (
+              <span style={{ position: 'absolute', top: '4px', right: '4px', background: 'var(--red)', color: '#fff', borderRadius: '10px', padding: '1px 5px', fontSize: '9px', fontWeight: 800, lineHeight: '14px' }}>
+                {alertCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -343,6 +355,54 @@ export default function AdminScreen() {
                 </div>
               ))}
             </div>
+            {/* ── Stock Alerts ── */}
+            {alertCount > 0 && (
+              <div style={{ background: 'rgba(224,16,16,.07)', border: '1px solid rgba(224,16,16,.25)', borderRadius: '16px', padding: '16px', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '16px' }}>⚠️</span>
+                    <div style={{ fontFamily: 'Syne', fontSize: '14px', fontWeight: 800, color: 'var(--red)' }}>
+                      Stock Alerts
+                    </div>
+                    <span style={{ background: 'var(--red)', color: '#fff', borderRadius: '20px', padding: '2px 8px', fontSize: '11px', fontWeight: 800 }}>
+                      {alertCount}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setTab('stock')}
+                    style={{ fontSize: '11px', fontWeight: 700, color: 'var(--red)', background: 'rgba(224,16,16,.1)', border: '1px solid rgba(224,16,16,.2)', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer' }}>
+                    Manage Stock →
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                  {alertItems.map(item => {
+                    const isOut = item.stock <= 0;
+                    return (
+                      <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg2)', border: `1px solid ${isOut ? 'rgba(224,16,16,.3)' : 'rgba(245,158,11,.3)'}`, borderRadius: '10px', padding: '10px 12px' }}>
+                        {item.photo
+                          ? <img src={item.photo} style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />
+                          : <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🍺</div>}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontFamily: 'Syne', fontSize: '12px', fontWeight: 700, marginBottom: '2px' }}>{item.name}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: isOut ? 'var(--red)' : 'var(--warning)' }}>
+                              {isOut ? 'Out of stock' : `Low stock: ${item.stock} left`}
+                            </span>
+                            <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: isOut ? 'var(--red)' : 'var(--warning)', display: 'inline-block', animation: 'pulse 1.4s ease-in-out infinite' }} />
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setRestockItem(item)}
+                          style={{ background: isOut ? 'var(--red)' : 'rgba(245,158,11,.15)', color: isOut ? '#fff' : 'var(--warning)', border: `1px solid ${isOut ? 'var(--red)' : 'rgba(245,158,11,.3)'}`, borderRadius: '8px', padding: '5px 12px', fontSize: '11px', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'Syne' }}>
+                          + Restock
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div style={cardStyle}>
               <div style={{ fontFamily: 'Syne', fontSize: '14px', fontWeight: 700, marginBottom: '14px' }}>Today — Payment Breakdown</div>
               {dashPieData.length > 0 ? (
