@@ -185,18 +185,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Fire out-of-stock SMS alerts (fire-and-forget)
     if (newlyOutOfStock.length > 0) {
-      const { smsPhone, whatsappPhone } = notifRef.current;
-      const names = newlyOutOfStock.join(', ');
-      const msg = `⚠️ KUNIM BAR ALERT: ${names} just went OUT OF STOCK. Please restock urgently.`;
-      [smsPhone, whatsappPhone]
-        .filter(p => p && p.trim())
-        .forEach(phone => {
-          fetch('/api/notify/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to: phone, message: msg }),
-          }).catch(() => {});
-        });
+      const { smsPhone } = notifRef.current;
+      if (smsPhone && smsPhone.trim()) {
+        const names = newlyOutOfStock.join(', ');
+        const msg = `⚠️ KUNIM BAR ALERT: ${names} just went OUT OF STOCK. Please restock urgently.`;
+        fetch('/api/notify/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: smsPhone, message: msg }),
+        }).catch(() => {});
+      }
     }
 
     const savedOrder: Order = { ...order, id: ref.id };

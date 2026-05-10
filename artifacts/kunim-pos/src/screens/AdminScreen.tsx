@@ -253,13 +253,11 @@ export default function AdminScreen() {
   const [confPass, setConfPass] = useState('');
   const [accMsg, setAccMsg] = useState('');
   const [smsPhone, setSmsPhone] = useState(notifSettings.smsPhone);
-  const [waPhone, setWaPhone] = useState(notifSettings.whatsappPhone);
   const [notifMsg, setNotifMsg] = useState('');
   const [notifSending, setNotifSending] = useState(false);
 
   useEffect(() => {
     setSmsPhone(notifSettings.smsPhone);
-    setWaPhone(notifSettings.whatsappPhone);
   }, [notifSettings]);
 
   useEffect(() => {
@@ -312,9 +310,8 @@ export default function AdminScreen() {
   }
 
   async function handleSendSms() {
-    const phones = [smsPhone, waPhone].filter(p => p && p.trim());
-    if (phones.length === 0) {
-      setNotifMsg('⚠️ No phone numbers configured. Add them in Account → SMS Alerts.');
+    if (!smsPhone || !smsPhone.trim()) {
+      setNotifMsg('⚠️ No SMS number configured. Add one in Account → SMS Alerts.');
       setTimeout(() => setNotifMsg(''), 5000);
       return;
     }
@@ -331,9 +328,7 @@ export default function AdminScreen() {
     setNotifSending(true);
     setNotifMsg('');
     try {
-      await Promise.all(phones.map(phone =>
-        fetch('/api/notify/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: phone, message: msg }) })
-      ));
+      await fetch('/api/notify/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: smsPhone, message: msg }) });
       setNotifMsg('✅ SMS report sent successfully!');
     } catch {
       setNotifMsg('❌ Send failed. Check AT_USERNAME & AT_API_KEY in environment secrets.');
@@ -344,8 +339,8 @@ export default function AdminScreen() {
   }
 
   async function saveNotifSettings() {
-    await setNotifSettings({ smsPhone, whatsappPhone: waPhone });
-    setAccMsg('Notification numbers saved.');
+    await setNotifSettings({ smsPhone });
+    setAccMsg('SMS number saved.');
     setTimeout(() => setAccMsg(''), 3000);
   }
 
@@ -862,21 +857,16 @@ export default function AdminScreen() {
             <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px', maxWidth: '400px', marginTop: '16px' }}>
               <div style={{ fontFamily: 'Syne', fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>📱 SMS Alerts</div>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '14px', lineHeight: '1.7' }}>
-                Enter phone numbers to receive out-of-stock alerts and daily sales reports.<br />
+                Enter a phone number to receive out-of-stock alerts and daily sales reports via SMS.<br />
                 <span style={{ color: 'var(--gold)', fontWeight: 700 }}>Setup required:</span> Create a free account at <span style={{ color: 'var(--gold)' }}>africastalking.com</span>, then add <code style={{ background: 'var(--bg3)', padding: '1px 5px', borderRadius: '4px', fontSize: '11px' }}>AT_USERNAME</code> and <code style={{ background: 'var(--bg3)', padding: '1px 5px', borderRadius: '4px', fontSize: '11px' }}>AT_API_KEY</code> to the environment secrets.
               </div>
-              <div style={{ marginBottom: '14px' }}>
+              <div style={{ marginBottom: '18px' }}>
                 <label style={labelStyle}>SMS Phone Number</label>
                 <input value={smsPhone} onChange={e => setSmsPhone(e.target.value)} placeholder="+233XXXXXXXXX" style={inputStyle} />
                 <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Include country code (e.g. +233 for Ghana)</div>
               </div>
-              <div style={{ marginBottom: '18px' }}>
-                <label style={labelStyle}>WhatsApp Number</label>
-                <input value={waPhone} onChange={e => setWaPhone(e.target.value)} placeholder="+233XXXXXXXXX" style={inputStyle} />
-                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Must be a WhatsApp-registered number</div>
-              </div>
               <button onClick={saveNotifSettings} style={{ width: '100%', background: 'var(--gold)', color: 'var(--bg)', border: 'none', borderRadius: '10px', padding: '12px', fontFamily: 'Syne', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>
-                Save Notification Numbers
+                Save SMS Number
               </button>
             </div>
           </>
