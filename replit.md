@@ -13,7 +13,7 @@ A full-featured point-of-sale system for Kunim Guest House Bar, powered by Chale
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
 - Frontend: React + Vite, Firebase Firestore (real-time DB)
-- API: Express 5 (health check only, POS data is in Firebase)
+- API: Express 5 — health check + `/api/notify/send` SMS route (Africa's Talking)
 - Charts: Recharts
 - Fonts: Syne + Nunito (Google Fonts)
 

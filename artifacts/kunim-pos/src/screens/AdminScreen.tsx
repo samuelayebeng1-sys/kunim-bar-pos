@@ -10,7 +10,7 @@ import RestockModal from '../components/modals/RestockModal';
 import { MenuItem, Cashier, Category, Order } from '../lib/types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
-type AdminTab = 'dashboard' | 'menu' | 'stock' | 'categories' | 'cashiers' | 'reports' | 'account';
+type AdminTab = 'dashboard' | 'menu' | 'stock' | 'categories' | 'cashiers' | 'reports' | 'transactions' | 'account';
 type ReportPeriod = 'today' | 'week' | 'month' | 'year';
 
 const PIE_COLORS = ['#22c55e', '#f0c040', '#60a5fa'];
@@ -173,6 +173,51 @@ function printAdminReport(
       </table>`}
     </div>` : ''}
 
+    <div class="section" style="page-break-before:always">
+      <h2>Cashier Transaction Log</h2>
+      ${orders.length === 0 ? '<p style="color:#aaa;font-size:12px">No transactions</p>' : `
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Date</th>
+            <th>Cashier</th>
+            <th>Items</th>
+            <th>Payment</th>
+            <th style="text-align:right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${orders
+            .slice()
+            .sort((a: Order, b: Order) => {
+              const ta = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
+              const tb = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
+              return ta - tb;
+            })
+            .map((o: Order) => {
+              const ts = o.timestamp?.toDate ? o.timestamp.toDate() : null;
+              const timeStr = ts ? ts.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '—';
+              const itemStr = (o.items || []).map((i: { name: string; qty: number }) => `${i.name} ×${i.qty}`).join(', ');
+              return `<tr>
+                <td style="white-space:nowrap">${timeStr}</td>
+                <td style="white-space:nowrap">${o.date}</td>
+                <td>${o.cashier}</td>
+                <td style="font-size:11px;color:#555">${itemStr}</td>
+                <td>${o.paymentMethod}</td>
+                <td style="text-align:right;font-weight:700">GH&#8373; ${(o.total || 0).toFixed(2)}</td>
+              </tr>`;
+            }).join('')}
+        </tbody>
+        <tfoot>
+          <tr style="font-weight:800;background:#f5f5f5">
+            <td colspan="5">TOTAL (${orders.length} orders)</td>
+            <td style="text-align:right">GH&#8373; ${repTotal.toFixed(2)}</td>
+          </tr>
+        </tfoot>
+      </table>`}
+    </div>
+
     <div class="footer">
       Kunim Guest House Bar &mdash; Powered by ChalePay &mdash; Confidential
     </div>
@@ -183,7 +228,7 @@ function printAdminReport(
 }
 
 export default function AdminScreen() {
-  const { menuItems, setMenuItems, cashiers, setCashiers, categories, setCategories, adminCreds, setAdminCreds } = useApp();
+  const { menuItems, setMenuItems, cashiers, setCashiers, categories, setCategories, adminCreds, setAdminCreds, notifSettings, setNotifSettings } = useApp();
   const [tab, setTab] = useState<AdminTab>('dashboard');
 
   const [editItem, setEditItem] = useState<MenuItem | null | undefined>(undefined);
@@ -198,14 +243,29 @@ export default function AdminScreen() {
   const [reportOrders, setReportOrders] = useState<Order[]>([]);
   const [reportLoading, setReportLoading] = useState(false);
 
+  const [transOrders, setTransOrders] = useState<Order[]>([]);
+  const [transLoading, setTransLoading] = useState(false);
+  const [transPeriod, setTransPeriod] = useState<ReportPeriod>('today');
+  const [transCashierFilter, setTransCashierFilter] = useState('');
+
   const [newUser, setNewUser] = useState(adminCreds.u);
   const [newPass, setNewPass] = useState('');
   const [confPass, setConfPass] = useState('');
   const [accMsg, setAccMsg] = useState('');
+  const [smsPhone, setSmsPhone] = useState(notifSettings.smsPhone);
+  const [waPhone, setWaPhone] = useState(notifSettings.whatsappPhone);
+  const [notifMsg, setNotifMsg] = useState('');
+  const [notifSending, setNotifSending] = useState(false);
+
+  useEffect(() => {
+    setSmsPhone(notifSettings.smsPhone);
+    setWaPhone(notifSettings.whatsappPhone);
+  }, [notifSettings]);
 
   useEffect(() => {
     if (tab === 'dashboard') loadDashboard();
     if (tab === 'reports') loadAdminReports('today');
+    if (tab === 'transactions') loadTransactions('today');
   }, [tab]);
 
   async function loadDashboard() {
@@ -237,6 +297,56 @@ export default function AdminScreen() {
     } finally {
       setReportLoading(false);
     }
+  }
+
+  async function loadTransactions(period: ReportPeriod) {
+    setTransPeriod(period);
+    setTransLoading(true);
+    const { from, to } = getDateRange(period);
+    try {
+      const snap = await getDocs(query(collection(db, 'orders'), where('date', '>=', from), where('date', '<=', to)));
+      setTransOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as Order)));
+    } finally {
+      setTransLoading(false);
+    }
+  }
+
+  async function handleSendSms() {
+    const phones = [smsPhone, waPhone].filter(p => p && p.trim());
+    if (phones.length === 0) {
+      setNotifMsg('⚠️ No phone numbers configured. Add them in Account → SMS Alerts.');
+      setTimeout(() => setNotifMsg(''), 5000);
+      return;
+    }
+    const total = reportOrders.reduce((s, o) => s + (o.total || 0), 0);
+    const byPay = { Cash: 0, MoMo: 0, Card: 0 };
+    reportOrders.forEach(o => {
+      if (byPay[o.paymentMethod as keyof typeof byPay] !== undefined)
+        byPay[o.paymentMethod as keyof typeof byPay] += o.total || 0;
+    });
+    const byItem: Record<string, number> = {};
+    reportOrders.forEach(o => (o.items || []).forEach(i => { byItem[i.name] = (byItem[i.name] || 0) + i.qty; }));
+    const top3 = Object.entries(byItem).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n, q]) => `${n}(${q})`).join(', ');
+    const msg = `📊 KUNIM BAR ${PERIOD_LABELS[reportPeriod].toUpperCase()} REPORT\nRevenue: GH₵${total.toFixed(2)} | Orders: ${reportOrders.length}\nCash: GH₵${byPay.Cash.toFixed(2)} | MoMo: GH₵${byPay.MoMo.toFixed(2)} | Card: GH₵${byPay.Card.toFixed(2)}\nTop items: ${top3 || 'N/A'}`;
+    setNotifSending(true);
+    setNotifMsg('');
+    try {
+      await Promise.all(phones.map(phone =>
+        fetch('/api/notify/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: phone, message: msg }) })
+      ));
+      setNotifMsg('✅ SMS report sent successfully!');
+    } catch {
+      setNotifMsg('❌ Send failed. Check AT_USERNAME & AT_API_KEY in environment secrets.');
+    } finally {
+      setNotifSending(false);
+      setTimeout(() => setNotifMsg(''), 6000);
+    }
+  }
+
+  async function saveNotifSettings() {
+    await setNotifSettings({ smsPhone, whatsappPhone: waPhone });
+    setAccMsg('Notification numbers saved.');
+    setTimeout(() => setAccMsg(''), 3000);
   }
 
   async function delItem(id: string) {
@@ -301,6 +411,17 @@ export default function AdminScreen() {
   const alertItems = [...outOfStock, ...lowStock];
   const alertCount = alertItems.length;
 
+  // Transactions computed
+  const transFiltered = (transCashierFilter
+    ? transOrders.filter(o => o.cashier === transCashierFilter)
+    : transOrders
+  ).slice().sort((a, b) => {
+    const ta = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
+    const tb = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
+    return tb - ta;
+  });
+  const transTotal = transFiltered.reduce((s, o) => s + (o.total || 0), 0);
+
   const tabs: { id: AdminTab; label: string }[] = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'menu', label: 'Menu Items' },
@@ -308,6 +429,7 @@ export default function AdminScreen() {
     { id: 'categories', label: 'Categories' },
     { id: 'cashiers', label: 'Cashiers' },
     { id: 'reports', label: 'Reports' },
+    { id: 'transactions', label: 'Transactions' },
     { id: 'account', label: 'Account' },
   ];
 
@@ -524,18 +646,31 @@ export default function AdminScreen() {
         {/* REPORTS */}
         {tab === 'reports' && (
           <>
-            {/* Header row with Print button */}
+            {/* Header row with action buttons */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
               <div style={{ fontFamily: 'Syne', fontSize: '18px', fontWeight: 700 }}>Reports</div>
-              <button
-                onClick={() => printAdminReport(reportPeriod, reportOrders, repTotal, repByPay, repTopItems, repByDate)}
-                disabled={reportOrders.length === 0}
-                style={{ display: 'flex', alignItems: 'center', gap: '7px', background: reportOrders.length === 0 ? 'var(--bg3)' : 'var(--gold)', color: reportOrders.length === 0 ? 'var(--text3)' : 'var(--bg)', border: 'none', borderRadius: '10px', padding: '9px 18px', fontFamily: 'Syne', fontSize: '13px', fontWeight: 800, cursor: reportOrders.length === 0 ? 'not-allowed' : 'pointer', transition: 'all .2s' }}
-              >
-                <span>🖨</span>
-                Print {PERIOD_LABELS[reportPeriod]} Report
-              </button>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={handleSendSms}
+                  disabled={reportOrders.length === 0 || notifSending}
+                  style={{ display: 'flex', alignItems: 'center', gap: '7px', background: reportOrders.length === 0 || notifSending ? 'var(--bg3)' : 'rgba(34,197,94,.12)', color: reportOrders.length === 0 || notifSending ? 'var(--text3)' : 'var(--success)', border: `1px solid ${reportOrders.length === 0 || notifSending ? 'var(--border)' : 'rgba(34,197,94,.25)'}`, borderRadius: '10px', padding: '9px 16px', fontFamily: 'Syne', fontSize: '13px', fontWeight: 800, cursor: reportOrders.length === 0 || notifSending ? 'not-allowed' : 'pointer' }}>
+                  <span>📱</span>
+                  {notifSending ? 'Sending...' : 'Send SMS'}
+                </button>
+                <button
+                  onClick={() => printAdminReport(reportPeriod, reportOrders, repTotal, repByPay, repTopItems, repByDate)}
+                  disabled={reportOrders.length === 0}
+                  style={{ display: 'flex', alignItems: 'center', gap: '7px', background: reportOrders.length === 0 ? 'var(--bg3)' : 'var(--gold)', color: reportOrders.length === 0 ? 'var(--text3)' : 'var(--bg)', border: 'none', borderRadius: '10px', padding: '9px 18px', fontFamily: 'Syne', fontSize: '13px', fontWeight: 800, cursor: reportOrders.length === 0 ? 'not-allowed' : 'pointer', transition: 'all .2s' }}>
+                  <span>🖨</span>
+                  Print Report
+                </button>
+              </div>
             </div>
+            {notifMsg && (
+              <div style={{ marginBottom: '10px', fontSize: '13px', padding: '9px 13px', borderRadius: '10px', background: notifMsg.startsWith('✅') ? 'rgba(34,197,94,.1)' : notifMsg.startsWith('❌') ? 'rgba(224,16,16,.1)' : 'rgba(255,255,0,.06)', color: notifMsg.startsWith('✅') ? 'var(--success)' : notifMsg.startsWith('❌') ? 'var(--red)' : 'var(--gold)', border: `1px solid ${notifMsg.startsWith('✅') ? 'rgba(34,197,94,.2)' : notifMsg.startsWith('❌') ? 'rgba(224,16,16,.2)' : 'rgba(255,255,0,.15)'}` }}>
+                {notifMsg}
+              </div>
+            )}
 
             {/* Period selector */}
             <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
@@ -626,6 +761,83 @@ export default function AdminScreen() {
           </>
         )}
 
+        {/* TRANSACTIONS */}
+        {tab === 'transactions' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ fontFamily: 'Syne', fontSize: '18px', fontWeight: 700 }}>Transactions</div>
+              {transFiltered.length > 0 && (
+                <div style={{ fontSize: '12px', color: 'var(--text3)', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '5px 12px' }}>
+                  {transFiltered.length} orders &nbsp;·&nbsp; <span style={{ color: 'var(--gold)', fontWeight: 700 }}>GH₵{transTotal.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Period selector */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
+              {(['today', 'week', 'month', 'year'] as ReportPeriod[]).map(p => (
+                <button key={p} onClick={() => loadTransactions(p)}
+                  style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, border: `1px solid ${transPeriod === p ? 'var(--red)' : 'var(--border)'}`, background: transPeriod === p ? 'var(--red)' : 'var(--bg3)', color: transPeriod === p ? '#fff' : 'var(--text2)', fontFamily: 'Syne', cursor: 'pointer' }}>
+                  {PERIOD_LABELS[p]}
+                </button>
+              ))}
+            </div>
+
+            {/* Cashier filter */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
+              <button onClick={() => setTransCashierFilter('')}
+                style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, border: `1px solid ${!transCashierFilter ? 'var(--gold)' : 'var(--border)'}`, background: !transCashierFilter ? 'rgba(240,192,64,.15)' : 'var(--bg3)', color: !transCashierFilter ? 'var(--gold)' : 'var(--text2)', cursor: 'pointer', fontFamily: 'Syne' }}>
+                All Staff
+              </button>
+              {cashiers.map(c => (
+                <button key={c.id} onClick={() => setTransCashierFilter(c.name)}
+                  style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, border: `1px solid ${transCashierFilter === c.name ? 'var(--gold)' : 'var(--border)'}`, background: transCashierFilter === c.name ? 'rgba(240,192,64,.15)' : 'var(--bg3)', color: transCashierFilter === c.name ? 'var(--gold)' : 'var(--text2)', cursor: 'pointer', fontFamily: 'Syne' }}>
+                  {c.name}
+                </button>
+              ))}
+            </div>
+
+            {transLoading ? (
+              <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text3)' }}>Loading...</div>
+            ) : transFiltered.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text3)' }}>No transactions found for this period</div>
+            ) : (
+              transFiltered.map(o => {
+                const ts = o.timestamp?.toDate ? o.timestamp.toDate() : null;
+                const timeStr = ts ? ts.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '—';
+                return (
+                  <div key={o.id} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '14px', padding: '13px 15px', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <div style={{ background: 'var(--bg3)', borderRadius: '8px', padding: '3px 9px', fontFamily: 'Syne', fontSize: '12px', fontWeight: 700, color: 'var(--text2)' }}>
+                          {timeStr}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{o.date}</div>
+                        <div style={{ fontFamily: 'Syne', fontSize: '12px', fontWeight: 700, color: 'var(--gold)' }}>
+                          {o.cashier}
+                        </div>
+                        <span style={{ fontSize: '10px', background: o.paymentMethod === 'Cash' ? 'rgba(34,197,94,.12)' : o.paymentMethod === 'MoMo' ? 'rgba(240,192,64,.12)' : 'rgba(96,165,250,.12)', color: o.paymentMethod === 'Cash' ? 'var(--success)' : o.paymentMethod === 'MoMo' ? 'var(--gold)' : '#60a5fa', borderRadius: '20px', padding: '2px 7px', fontWeight: 700 }}>
+                          {o.paymentMethod}
+                        </span>
+                      </div>
+                      <div style={{ fontFamily: 'Syne', fontSize: '15px', fontWeight: 800, color: 'var(--gold)' }}>
+                        GH₵{(o.total || 0).toFixed(2)}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                      {(o.items || []).map((item, idx) => (
+                        <span key={idx} style={{ fontSize: '11px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '2px 8px', color: 'var(--text2)' }}>
+                          {item.name} ×{item.qty}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </>
+        )}
+
         {/* ACCOUNT */}
         {tab === 'account' && (
           <>
@@ -645,6 +857,27 @@ export default function AdminScreen() {
               </div>
               <button onClick={saveAccount} style={{ width: '100%', background: 'var(--gold)', color: 'var(--bg)', border: 'none', borderRadius: '10px', padding: '12px', fontFamily: 'Syne', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>Save Changes</button>
               {accMsg && <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--success)' }}>{accMsg}</div>}
+            </div>
+
+            <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px', maxWidth: '400px', marginTop: '16px' }}>
+              <div style={{ fontFamily: 'Syne', fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>📱 SMS Alerts</div>
+              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '14px', lineHeight: '1.7' }}>
+                Enter phone numbers to receive out-of-stock alerts and daily sales reports.<br />
+                <span style={{ color: 'var(--gold)', fontWeight: 700 }}>Setup required:</span> Create a free account at <span style={{ color: 'var(--gold)' }}>africastalking.com</span>, then add <code style={{ background: 'var(--bg3)', padding: '1px 5px', borderRadius: '4px', fontSize: '11px' }}>AT_USERNAME</code> and <code style={{ background: 'var(--bg3)', padding: '1px 5px', borderRadius: '4px', fontSize: '11px' }}>AT_API_KEY</code> to the environment secrets.
+              </div>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={labelStyle}>SMS Phone Number</label>
+                <input value={smsPhone} onChange={e => setSmsPhone(e.target.value)} placeholder="+233XXXXXXXXX" style={inputStyle} />
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Include country code (e.g. +233 for Ghana)</div>
+              </div>
+              <div style={{ marginBottom: '18px' }}>
+                <label style={labelStyle}>WhatsApp Number</label>
+                <input value={waPhone} onChange={e => setWaPhone(e.target.value)} placeholder="+233XXXXXXXXX" style={inputStyle} />
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Must be a WhatsApp-registered number</div>
+              </div>
+              <button onClick={saveNotifSettings} style={{ width: '100%', background: 'var(--gold)', color: 'var(--bg)', border: 'none', borderRadius: '10px', padding: '12px', fontFamily: 'Syne', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>
+                Save Notification Numbers
+              </button>
             </div>
           </>
         )}

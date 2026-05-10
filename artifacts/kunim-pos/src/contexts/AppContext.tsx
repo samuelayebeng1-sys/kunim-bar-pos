@@ -1,10 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   collection, getDocs, addDoc, updateDoc, deleteDoc,
-  doc, query, orderBy, serverTimestamp
+  doc, query, orderBy, serverTimestamp, setDoc, getDoc
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Cashier, Category, MenuItem, CartItem, Order, Screen, PaymentMethod } from '../lib/types';
+import { Cashier, Category, MenuItem, CartItem, Order, Screen, PaymentMethod, NotificationSettings } from '../lib/types';
 
 const DEFAULT_CATS = ['Alcoholic Drinks', 'Soft Drinks', 'Water & Juice', 'Cocktails & Mixers'];
 const DEFAULT_CASHIERS = [
@@ -56,6 +56,8 @@ interface AppContextType {
   updateQty: (id: string, delta: number) => void;
   processOrder: (customer: string, table: string) => Promise<Order | null>;
   refreshMenu: () => Promise<void>;
+  notifSettings: NotificationSettings;
+  setNotifSettings: (s: NotificationSettings) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -73,6 +75,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [shiftOrders, setShiftOrders] = useState<Order[]>([]);
   const [shiftStartTime, setShiftStartTime] = useState<Date>(new Date());
+  const [notifSettings, setNotifSettingsState] = useState<NotificationSettings>({ smsPhone: '', whatsappPhone: '' });
+
+  // Ref so processOrder callback always reads current settings without stale closure
+  const notifRef = useRef<NotificationSettings>({ smsPhone: '', whatsappPhone: '' });
+  useEffect(() => { notifRef.current = notifSettings; }, [notifSettings]);
 
   const seed = useCallback(async () => {
     const cSnap = await getDocs(collection(db, 'cashiers'));
@@ -93,14 +100,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       await seed();
-      const [cSnap, catSnap, mSnap] = await Promise.all([
+      const [cSnap, catSnap, mSnap, notifSnap] = await Promise.all([
         getDocs(query(collection(db, 'cashiers'), orderBy('name'))),
         getDocs(collection(db, 'categories')),
         getDocs(collection(db, 'menu')),
+        getDoc(doc(db, 'settings', 'notifications')),
       ]);
       setCashiers(cSnap.docs.map(d => ({ id: d.id, ...d.data() } as Cashier)));
       setCategories(catSnap.docs.map(d => ({ id: d.id, ...d.data() } as Category)));
       setMenuItems(mSnap.docs.map(d => ({ id: d.id, ...d.data() } as MenuItem)));
+      if (notifSnap.exists()) {
+        const data = notifSnap.data() as NotificationSettings;
+        setNotifSettingsState(data);
+        notifRef.current = data;
+      }
     } catch (e) {
       console.error('Failed to load data', e);
     } finally {
@@ -118,6 +131,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const clearShift = useCallback(() => {
     setShiftOrders([]);
     setShiftStartTime(new Date());
+  }, []);
+
+  const setNotifSettings = useCallback(async (s: NotificationSettings) => {
+    setNotifSettingsState(s);
+    notifRef.current = s;
+    await setDoc(doc(db, 'settings', 'notifications'), s);
   }, []);
 
   const addToCart = useCallback((item: MenuItem) => {
@@ -151,14 +170,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       date: new Date().toISOString().split('T')[0],
     };
     const ref = await addDoc(collection(db, 'orders'), order);
+
+    // Detect items going out of stock before updating
+    const newlyOutOfStock: string[] = [];
     for (const cartItem of cart) {
       const menuItem = menuItems.find(m => m.id === cartItem.id);
       if (menuItem) {
         const newStock = menuItem.stock - cartItem.qty;
+        if (newStock <= 0) newlyOutOfStock.push(menuItem.name);
         await updateDoc(doc(db, 'menu', cartItem.id), { stock: newStock });
         setMenuItems(prev => prev.map(m => m.id === cartItem.id ? { ...m, stock: newStock } : m));
       }
     }
+
+    // Fire out-of-stock SMS alerts (fire-and-forget)
+    if (newlyOutOfStock.length > 0) {
+      const { smsPhone, whatsappPhone } = notifRef.current;
+      const names = newlyOutOfStock.join(', ');
+      const msg = `⚠️ KUNIM BAR ALERT: ${names} just went OUT OF STOCK. Please restock urgently.`;
+      [smsPhone, whatsappPhone]
+        .filter(p => p && p.trim())
+        .forEach(phone => {
+          fetch('/api/notify/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: phone, message: msg }),
+          }).catch(() => {});
+        });
+    }
+
     const savedOrder: Order = { ...order, id: ref.id };
     setShiftOrders(prev => [...prev, savedOrder]);
     setCart([]);
@@ -191,6 +231,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       clearShift,
       addToCart, updateQty, processOrder,
       refreshMenu,
+      notifSettings, setNotifSettings,
     }}>
       {children}
     </AppContext.Provider>

@@ -50,3 +50,8 @@ export interface Order {
 
 export type PaymentMethod = 'Cash' | 'MoMo' | 'Card';
 export type Screen = 'login' | 'pos' | 'orders' | 'reports' | 'admin';
+
+export interface NotificationSettings {
+  smsPhone: string;
+  whatsappPhone: string;
+}
