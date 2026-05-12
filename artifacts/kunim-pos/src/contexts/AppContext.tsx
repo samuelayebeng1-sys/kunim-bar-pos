@@ -189,7 +189,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (smsPhone && smsPhone.trim()) {
         const names = newlyOutOfStock.join(', ');
         const msg = `⚠️ KUNIM BAR ALERT: ${names} just went OUT OF STOCK. Please restock urgently.`;
-        fetch('/api/notify/send', {
+        fetch('http://localhost:8080/api/notify/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ to: smsPhone, message: msg }),

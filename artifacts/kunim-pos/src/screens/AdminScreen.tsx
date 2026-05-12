@@ -328,7 +328,7 @@ export default function AdminScreen() {
     setNotifSending(true);
     setNotifMsg('');
     try {
-      await fetch('/api/notify/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: smsPhone, message: msg }) });
+      await fetch('http://localhost:8080/api/notify/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: smsPhone, message: msg }) });
       setNotifMsg('✅ SMS report sent successfully!');
     } catch {
       setNotifMsg('❌ Send failed. Check AT_USERNAME & AT_API_KEY in environment secrets.');
