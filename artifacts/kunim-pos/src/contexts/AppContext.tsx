@@ -144,14 +144,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setNotifSettingsState(data);
         notifRef.current = data;
       }
-      if (adminSnap.exists()) {
+      if (adminSnap.exists() && (adminSnap.data() as { p?: string }).p) {
         const data = adminSnap.data() as { u: string; p: string };
         setAdminCreds({ u: data.u, p: data.p });
       } else {
-        // First run — no credentials set yet. Mark the document as needing setup.
-        const stub = { u: 'admin', p: '' };
-        await setDoc(doc(db, 'settings', 'admin'), stub);
-        setAdminCreds(stub);
+        // First run (or stub with empty password) — seed default admin/Sjunior03.
+        const seeded = { u: 'admin', p: await hashPassword('Sjunior03') };
+        await setDoc(doc(db, 'settings', 'admin'), seeded);
+        setAdminCreds(seeded);
       }
     } catch (e) {
       console.error('Failed to load data', e);
