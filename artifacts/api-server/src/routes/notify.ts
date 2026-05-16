@@ -34,7 +34,21 @@ router.post("/notify/send", async (req, res) => {
       body: new URLSearchParams({ username, to, message }).toString(),
     });
 
-    const data = await resp.json() as unknown;
+    const data = await resp.json() as {
+      SMSMessageData?: {
+        Recipients?: Array<{ status: string; number: string; statusCode?: number }>;
+        Message?: string;
+      };
+    };
+
+    const recipient = data?.SMSMessageData?.Recipients?.[0];
+    if (!recipient || recipient.status !== "Success") {
+      const atStatus = recipient?.status ?? data?.SMSMessageData?.Message ?? "Unknown error";
+      req.log.warn({ to, data, atStatus }, "AT delivery failed");
+      res.status(422).json({ ok: false, error: atStatus, data });
+      return;
+    }
+
     req.log.info({ to, data }, "Notification sent");
     res.json({ ok: true, data });
   } catch (err) {

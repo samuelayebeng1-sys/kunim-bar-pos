@@ -75,10 +75,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [shiftOrders, setShiftOrders] = useState<Order[]>([]);
   const [shiftStartTime, setShiftStartTime] = useState<Date>(new Date());
-  const [notifSettings, setNotifSettingsState] = useState<NotificationSettings>({ smsPhone: '', whatsappPhone: '' });
+  const [notifSettings, setNotifSettingsState] = useState<NotificationSettings>({ smsPhone: '' });
 
   // Ref so processOrder callback always reads current settings without stale closure
-  const notifRef = useRef<NotificationSettings>({ smsPhone: '', whatsappPhone: '' });
+  const notifRef = useRef<NotificationSettings>({ smsPhone: '' });
   useEffect(() => { notifRef.current = notifSettings; }, [notifSettings]);
 
   const seed = useCallback(async () => {
@@ -187,13 +187,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (newlyOutOfStock.length > 0) {
       const { smsPhone } = notifRef.current;
       if (smsPhone && smsPhone.trim()) {
-        const names = newlyOutOfStock.join(', ');
-        const msg = `⚠️ KUNIM BAR ALERT: ${names} just went OUT OF STOCK. Please restock urgently.`;
-        fetch('/api/notify/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: smsPhone, message: msg }),
-        }).catch(() => {});
+        const raw = smsPhone.trim();
+        const normalized = raw.startsWith('0') ? '+233' + raw.slice(1) : raw;
+        if (/^\+\d{7,15}$/.test(normalized)) {
+          const names = newlyOutOfStock.join(', ');
+          const msg = `⚠️ KUNIM BAR ALERT: ${names} just went OUT OF STOCK. Please restock urgently.`;
+          fetch('/api/notify/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: normalized, message: msg }),
+          })
+            .then(res => res.json())
+            .then((json: { ok?: boolean; error?: string }) => {
+              if (!json.ok) console.warn('[SMS] Out-of-stock alert failed:', json.error ?? 'Unknown error');
+            })
+            .catch(err => console.warn('[SMS] Out-of-stock alert network error:', err));
+        } else {
+          console.warn('[SMS] Out-of-stock alert skipped — invalid phone number format:', raw);
+        }
       }
     }
 

@@ -309,10 +309,22 @@ export default function AdminScreen() {
     }
   }
 
+  function normalizePhone(raw: string): string {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('0')) return '+233' + trimmed.slice(1);
+    return trimmed;
+  }
+
   async function handleSendSms() {
     if (!smsPhone || !smsPhone.trim()) {
       setNotifMsg('⚠️ No SMS number configured. Add one in Account → SMS Alerts.');
       setTimeout(() => setNotifMsg(''), 5000);
+      return;
+    }
+    const normalized = normalizePhone(smsPhone);
+    if (!/^\+\d{7,15}$/.test(normalized)) {
+      setNotifMsg(`⚠️ Invalid phone number format. Use international format, e.g. +233244123456`);
+      setTimeout(() => setNotifMsg(''), 6000);
       return;
     }
     const total = reportOrders.reduce((s, o) => s + (o.total || 0), 0);
@@ -328,8 +340,13 @@ export default function AdminScreen() {
     setNotifSending(true);
     setNotifMsg('');
     try {
-      await fetch('/api/notify/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: smsPhone, message: msg }) });
-      setNotifMsg('✅ SMS report sent successfully!');
+      const res = await fetch('/api/notify/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: normalized, message: msg }) });
+      const json = await res.json() as { ok?: boolean; error?: string };
+      if (res.ok && json.ok) {
+        setNotifMsg('✅ SMS report sent successfully!');
+      } else {
+        setNotifMsg(`❌ SMS failed: ${json.error ?? 'Unknown error'}`);
+      }
     } catch {
       setNotifMsg('❌ Send failed. Check AT_USERNAME & AT_API_KEY in environment secrets.');
     } finally {
