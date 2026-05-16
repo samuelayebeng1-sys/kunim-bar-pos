@@ -255,11 +255,15 @@ export default function AdminScreen() {
   const [showConfPass, setShowConfPass] = useState(false);
   const [accMsg, setAccMsg] = useState('');
   const [smsPhone, setSmsPhone] = useState(notifSettings.smsPhone);
+  const [lowStockThreshold, setLowStockThreshold] = useState(notifSettings.lowStockThreshold ?? 5);
+  const [reportTime, setReportTime] = useState(notifSettings.reportTime ?? '22:00');
   const [notifMsg, setNotifMsg] = useState('');
   const [notifSending, setNotifSending] = useState(false);
 
   useEffect(() => {
     setSmsPhone(notifSettings.smsPhone);
+    setLowStockThreshold(notifSettings.lowStockThreshold ?? 5);
+    setReportTime(notifSettings.reportTime ?? '22:00');
   }, [notifSettings]);
 
   useEffect(() => {
@@ -358,8 +362,8 @@ export default function AdminScreen() {
   }
 
   async function saveNotifSettings() {
-    await setNotifSettings({ smsPhone });
-    setAccMsg('SMS number saved.');
+    await setNotifSettings({ smsPhone, lowStockThreshold, reportTime });
+    setAccMsg('SMS settings saved.');
     setTimeout(() => setAccMsg(''), 3000);
   }
 
@@ -897,13 +901,35 @@ export default function AdminScreen() {
                 Enter a phone number to receive out-of-stock alerts and daily sales reports via SMS.<br />
                 <span style={{ color: 'var(--gold)', fontWeight: 700 }}>Setup required:</span> Create a free account at <span style={{ color: 'var(--gold)' }}>africastalking.com</span>, then add <code style={{ background: 'var(--bg3)', padding: '1px 5px', borderRadius: '4px', fontSize: '11px' }}>AT_USERNAME</code> and <code style={{ background: 'var(--bg3)', padding: '1px 5px', borderRadius: '4px', fontSize: '11px' }}>AT_API_KEY</code> to the environment secrets.
               </div>
-              <div style={{ marginBottom: '18px' }}>
+              <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>SMS Phone Number</label>
                 <input value={smsPhone} onChange={e => setSmsPhone(e.target.value)} placeholder="+233XXXXXXXXX" style={inputStyle} />
-                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Include country code (e.g. +233 for Ghana)</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Include country code (e.g. +233 for Ghana). Leading 0 is auto-corrected.</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '18px' }}>
+                <div>
+                  <label style={labelStyle}>Low Stock Warning (units)</label>
+                  <input
+                    type="number" min={1} max={100}
+                    value={lowStockThreshold}
+                    onChange={e => setLowStockThreshold(Number(e.target.value))}
+                    style={inputStyle}
+                  />
+                  <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Alert when stock drops to this level</div>
+                </div>
+                <div>
+                  <label style={labelStyle}>Daily Report Time</label>
+                  <input
+                    type="time"
+                    value={reportTime}
+                    onChange={e => setReportTime(e.target.value)}
+                    style={{ ...inputStyle, colorScheme: 'dark' }}
+                  />
+                  <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Auto-sends sales summary daily</div>
+                </div>
               </div>
               <button onClick={saveNotifSettings} style={{ width: '100%', background: 'var(--gold)', color: 'var(--bg)', border: 'none', borderRadius: '10px', padding: '12px', fontFamily: 'Syne', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>
-                Save SMS Number
+                Save SMS Settings
               </button>
             </div>
           </>

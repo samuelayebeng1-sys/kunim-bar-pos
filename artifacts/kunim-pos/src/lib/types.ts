@@ -53,4 +53,6 @@ export type Screen = 'login' | 'pos' | 'orders' | 'reports' | 'admin';
 
 export interface NotificationSettings {
   smsPhone: string;
+  lowStockThreshold: number;
+  reportTime: string;
 }

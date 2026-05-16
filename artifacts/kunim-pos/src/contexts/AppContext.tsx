@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   collection, getDocs, addDoc, updateDoc, deleteDoc,
-  doc, query, orderBy, serverTimestamp, setDoc, getDoc
+  doc, query, orderBy, serverTimestamp, setDoc, getDoc, where
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Cashier, Category, MenuItem, CartItem, Order, Screen, PaymentMethod, NotificationSettings } from '../lib/types';
@@ -28,6 +28,29 @@ const DEFAULT_MENU = [
   { name: 'Chapman', category: 'Cocktails & Mixers', price: 25, stock: 15, photo: '' },
   { name: 'Mojito', category: 'Cocktails & Mixers', price: 30, stock: 10, photo: '' },
 ];
+
+const DEFAULT_NOTIF: NotificationSettings = { smsPhone: '', lowStockThreshold: 5, reportTime: '22:00' };
+
+function normalizePhone(raw: string): string | null {
+  const t = raw.trim();
+  const n = t.startsWith('0') ? '+233' + t.slice(1) : t;
+  return /^\+\d{7,15}$/.test(n) ? n : null;
+}
+
+function sendSms(phone: string, message: string) {
+  const normalized = normalizePhone(phone);
+  if (!normalized) { console.warn('[SMS] Invalid phone number:', phone); return; }
+  fetch('/api/notify/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to: normalized, message }),
+  })
+    .then(r => r.json())
+    .then((j: { ok?: boolean; error?: string }) => {
+      if (!j.ok) console.warn('[SMS] Delivery failed:', j.error ?? 'Unknown error');
+    })
+    .catch(err => console.warn('[SMS] Network error:', err));
+}
 
 interface AppContextType {
   screen: Screen;
@@ -75,10 +98,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [shiftOrders, setShiftOrders] = useState<Order[]>([]);
   const [shiftStartTime, setShiftStartTime] = useState<Date>(new Date());
-  const [notifSettings, setNotifSettingsState] = useState<NotificationSettings>({ smsPhone: '' });
+  const [notifSettings, setNotifSettingsState] = useState<NotificationSettings>(DEFAULT_NOTIF);
 
   // Ref so processOrder callback always reads current settings without stale closure
-  const notifRef = useRef<NotificationSettings>({ smsPhone: '' });
+  const notifRef = useRef<NotificationSettings>(DEFAULT_NOTIF);
   useEffect(() => { notifRef.current = notifSettings; }, [notifSettings]);
 
   const seed = useCallback(async () => {
@@ -110,7 +133,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCategories(catSnap.docs.map(d => ({ id: d.id, ...d.data() } as Category)));
       setMenuItems(mSnap.docs.map(d => ({ id: d.id, ...d.data() } as MenuItem)));
       if (notifSnap.exists()) {
-        const data = notifSnap.data() as NotificationSettings;
+        const raw = notifSnap.data();
+        const data: NotificationSettings = {
+          smsPhone: raw.smsPhone ?? '',
+          lowStockThreshold: raw.lowStockThreshold ?? 5,
+          reportTime: raw.reportTime ?? '22:00',
+        };
         setNotifSettingsState(data);
         notifRef.current = data;
       }
@@ -137,6 +165,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setNotifSettingsState(s);
     notifRef.current = s;
     await setDoc(doc(db, 'settings', 'notifications'), s);
+  }, []);
+
+  // ── Scheduled daily report ──────────────────────────────────────────────────
+  useEffect(() => {
+    const tick = async () => {
+      const cfg = notifRef.current;
+      if (!cfg.smsPhone?.trim() || !cfg.reportTime) return;
+      const now = new Date();
+      const hhmm = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+      if (hhmm !== cfg.reportTime) return;
+      const today = now.toISOString().split('T')[0];
+      const lastSent = localStorage.getItem('lastDailyReportDate');
+      if (lastSent === today) return;
+      // Mark as sent immediately to avoid duplicate sends within the same minute
+      localStorage.setItem('lastDailyReportDate', today);
+      try {
+        const snap = await getDocs(query(collection(db, 'orders'), where('date', '==', today)));
+        const orders = snap.docs.map(d => d.data() as Order);
+        const total = orders.reduce((s, o) => s + (o.total || 0), 0);
+        const byPay = { Cash: 0, MoMo: 0, Card: 0 };
+        orders.forEach(o => { if (byPay[o.paymentMethod as keyof typeof byPay] !== undefined) byPay[o.paymentMethod as keyof typeof byPay] += o.total || 0; });
+        const byItem: Record<string, number> = {};
+        orders.forEach(o => (o.items || []).forEach(i => { byItem[i.name] = (byItem[i.name] || 0) + i.qty; }));
+        const top3 = Object.entries(byItem).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n, q]) => `${n}(${q})`).join(', ');
+        const msg = `📊 KUNIM BAR DAILY REPORT (${today})\nRevenue: GH₵${total.toFixed(2)} | Orders: ${orders.length}\nCash: GH₵${byPay.Cash.toFixed(2)} | MoMo: GH₵${byPay.MoMo.toFixed(2)} | Card: GH₵${byPay.Card.toFixed(2)}\nTop items: ${top3 || 'N/A'}`;
+        sendSms(cfg.smsPhone, msg);
+      } catch (e) {
+        console.warn('[SMS] Daily report query failed:', e);
+        localStorage.removeItem('lastDailyReportDate');
+      }
+    };
+
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
   }, []);
 
   const addToCart = useCallback((item: MenuItem) => {
@@ -171,40 +233,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     const ref = await addDoc(collection(db, 'orders'), order);
 
-    // Detect items going out of stock before updating
+    // Detect stock changes and fire alerts
     const newlyOutOfStock: string[] = [];
+    const newlyLowStock: Array<{ name: string; stock: number }> = [];
+    const threshold = notifRef.current.lowStockThreshold ?? 5;
+
     for (const cartItem of cart) {
       const menuItem = menuItems.find(m => m.id === cartItem.id);
       if (menuItem) {
-        const newStock = menuItem.stock - cartItem.qty;
-        if (newStock <= 0) newlyOutOfStock.push(menuItem.name);
+        const prevStock = menuItem.stock;
+        const newStock = prevStock - cartItem.qty;
+        if (newStock <= 0) {
+          newlyOutOfStock.push(menuItem.name);
+        } else if (newStock <= threshold && prevStock > threshold) {
+          newlyLowStock.push({ name: menuItem.name, stock: newStock });
+        }
         await updateDoc(doc(db, 'menu', cartItem.id), { stock: newStock });
         setMenuItems(prev => prev.map(m => m.id === cartItem.id ? { ...m, stock: newStock } : m));
       }
     }
 
-    // Fire out-of-stock SMS alerts (fire-and-forget)
-    if (newlyOutOfStock.length > 0) {
-      const { smsPhone } = notifRef.current;
-      if (smsPhone && smsPhone.trim()) {
-        const raw = smsPhone.trim();
-        const normalized = raw.startsWith('0') ? '+233' + raw.slice(1) : raw;
-        if (/^\+\d{7,15}$/.test(normalized)) {
-          const names = newlyOutOfStock.join(', ');
-          const msg = `⚠️ KUNIM BAR ALERT: ${names} just went OUT OF STOCK. Please restock urgently.`;
-          fetch('/api/notify/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to: normalized, message: msg }),
-          })
-            .then(res => res.json())
-            .then((json: { ok?: boolean; error?: string }) => {
-              if (!json.ok) console.warn('[SMS] Out-of-stock alert failed:', json.error ?? 'Unknown error');
-            })
-            .catch(err => console.warn('[SMS] Out-of-stock alert network error:', err));
-        } else {
-          console.warn('[SMS] Out-of-stock alert skipped — invalid phone number format:', raw);
-        }
+    const { smsPhone } = notifRef.current;
+    if (smsPhone?.trim()) {
+      if (newlyOutOfStock.length > 0) {
+        const names = newlyOutOfStock.join(', ');
+        sendSms(smsPhone, `⚠️ KUNIM BAR OUT OF STOCK: ${names} just ran out. Please restock urgently.`);
+      }
+      if (newlyLowStock.length > 0) {
+        const items = newlyLowStock.map(i => `${i.name} (${i.stock} left)`).join(', ');
+        sendSms(smsPhone, `📉 KUNIM BAR LOW STOCK: ${items}. Consider restocking soon.`);
       }
     }
 
