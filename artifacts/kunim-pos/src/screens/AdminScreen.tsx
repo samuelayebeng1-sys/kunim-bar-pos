@@ -250,7 +250,9 @@ export default function AdminScreen() {
 
   const [newUser, setNewUser] = useState(adminCreds.u);
   const [newPass, setNewPass] = useState('');
+  const [showNewPass, setShowNewPass] = useState(false);
   const [confPass, setConfPass] = useState('');
+  const [showConfPass, setShowConfPass] = useState(false);
   const [accMsg, setAccMsg] = useState('');
   const [smsPhone, setSmsPhone] = useState(notifSettings.smsPhone);
   const [notifMsg, setNotifMsg] = useState('');
@@ -861,11 +863,29 @@ export default function AdminScreen() {
               </div>
               <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>New Password</label>
-                <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="New password" style={inputStyle} />
+                <div style={{ position: 'relative' }}>
+                  <input type={showNewPass ? 'text' : 'password'} value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="New password" style={{ ...inputStyle, paddingRight: '40px' }} />
+                  <button type="button" onClick={() => setShowNewPass(v => !v)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: '4px', display: 'flex', alignItems: 'center' }}>
+                    {showNewPass ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    )}
+                  </button>
+                </div>
               </div>
               <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>Confirm Password</label>
-                <input type="password" value={confPass} onChange={e => setConfPass(e.target.value)} placeholder="Confirm password" style={inputStyle} />
+                <div style={{ position: 'relative' }}>
+                  <input type={showConfPass ? 'text' : 'password'} value={confPass} onChange={e => setConfPass(e.target.value)} placeholder="Confirm password" style={{ ...inputStyle, paddingRight: '40px' }} />
+                  <button type="button" onClick={() => setShowConfPass(v => !v)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: '4px', display: 'flex', alignItems: 'center' }}>
+                    {showConfPass ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    )}
+                  </button>
+                </div>
               </div>
               <button onClick={saveAccount} style={{ width: '100%', background: 'var(--gold)', color: 'var(--bg)', border: 'none', borderRadius: '10px', padding: '12px', fontFamily: 'Syne', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>Save Changes</button>
               {accMsg && <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--success)' }}>{accMsg}</div>}
