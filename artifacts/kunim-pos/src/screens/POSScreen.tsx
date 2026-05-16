@@ -12,8 +12,6 @@ export default function POSScreen({ onEndShift }: Props) {
   const { menuItems, categories, cart, addToCart, updateQty, selectedPayment, setSelectedPayment, processOrder } = useApp();
   const [searchQ, setSearchQ] = useState('');
   const [activeCat, setActiveCat] = useState('All');
-  const [custName, setCustName] = useState('');
-  const [tableNum, setTableNum] = useState('');
   const [charging, setCharging] = useState(false);
   const [receipt, setReceipt] = useState<Order | null>(null);
   const [printerConnected, setPrinterConnected] = useState(false);
@@ -32,11 +30,9 @@ export default function POSScreen({ onEndShift }: Props) {
     if (!cart.length) return;
     setCharging(true);
     try {
-      const order = await processOrder(custName, tableNum);
+      const order = await processOrder();
       if (order) {
         setReceipt(order);
-        setCustName('');
-        setTableNum('');
       }
     } catch {
       alert('Error saving order. Check your internet connection.');
@@ -134,17 +130,7 @@ export default function POSScreen({ onEndShift }: Props) {
         {/* Order Side */}
         <div style={{ background: 'var(--bg2)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '13px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '16px', fontWeight: 700, marginBottom: '10px' }}>Current Order</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px' }}>
-              <input value={custName} onChange={e => setCustName(e.target.value)} placeholder="Customer name"
-                style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 11px', color: 'var(--text)', fontSize: '13px', outline: 'none' }}
-                onFocus={e => e.currentTarget.style.borderColor = 'var(--gold)'}
-                onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'} />
-              <input value={tableNum} onChange={e => setTableNum(e.target.value)} placeholder="Table / Room"
-                style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 11px', color: 'var(--text)', fontSize: '13px', outline: 'none' }}
-                onFocus={e => e.currentTarget.style.borderColor = 'var(--gold)'}
-                onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'} />
-            </div>
+            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '16px', fontWeight: 700 }}>Current Order</div>
           </div>
 
           {/* Cart */}

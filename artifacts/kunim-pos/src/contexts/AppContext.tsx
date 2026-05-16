@@ -77,7 +77,7 @@ interface AppContextType {
   clearShift: () => void;
   addToCart: (item: MenuItem) => void;
   updateQty: (id: string, delta: number) => void;
-  processOrder: (customer: string, table: string) => Promise<Order | null>;
+  processOrder: () => Promise<Order | null>;
   refreshMenu: () => Promise<void>;
   notifSettings: NotificationSettings;
   setNotifSettings: (s: NotificationSettings) => Promise<void>;
@@ -217,7 +217,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCart(prev => prev.map(c => c.id === id ? { ...c, qty: c.qty + delta } : c).filter(c => c.qty > 0));
   }, []);
 
-  const processOrder = useCallback(async (customer: string, table: string): Promise<Order | null> => {
+  const processOrder = useCallback(async (): Promise<Order | null> => {
     if (!cart.length || !currentCashier) return null;
     const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
     const order: Omit<Order, 'id'> = {
@@ -226,8 +226,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       paymentMethod: selectedPayment,
       cashier: currentCashier.name,
       cashierId: currentCashier.id,
-      customer: customer || 'Walk-in',
-      table: table || '-',
+      customer: '',
+      table: '',
       timestamp: serverTimestamp(),
       date: new Date().toISOString().split('T')[0],
     };

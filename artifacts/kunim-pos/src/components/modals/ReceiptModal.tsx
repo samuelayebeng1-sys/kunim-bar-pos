@@ -42,8 +42,6 @@ export default function ReceiptModal({ order, onClose }: Props) {
     <div class="small">Powered by ChalePay</div>
     <div>${now.toLocaleDateString('en-GB')} &nbsp; ${now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
     <div>Cashier: <strong>${order.cashier}</strong></div>
-    ${order.customer !== 'Walk-in' ? `<div>Customer: ${order.customer}</div>` : ''}
-    ${order.table !== '-' ? `<div>Table / Room: ${order.table}</div>` : ''}
   </div>
   <div class="dashed"></div>
   <table>${rows}</table>
@@ -82,8 +80,7 @@ export default function ReceiptModal({ order, onClose }: Props) {
             <div style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '2px' }}>Kunim Guest House Bar</div>
             <div style={{ fontSize: '11px', color: '#555' }}>Powered by ChalePay</div>
             <div>{now.toLocaleDateString('en-GB')} {now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
-            <div>Cashier: {order.cashier} | Table: {order.table}</div>
-            <div>Customer: {order.customer}</div>
+            <div>Cashier: {order.cashier}</div>
           </div>
           <div style={{ marginBottom: '8px' }}>
             {order.items.map((item, i) => (

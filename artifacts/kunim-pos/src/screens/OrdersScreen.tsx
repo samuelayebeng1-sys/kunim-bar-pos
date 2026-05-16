@@ -75,8 +75,7 @@ export default function OrdersScreen({ onEndShift }: Props) {
               <div key={o.id} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '14px', padding: '14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                   <div>
-                    <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '13px', fontWeight: 700 }}>{o.customer}{o.table && o.table !== '-' ? ` · ${o.table}` : ''}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text3)' }}>By {o.cashier}</div>
+                    <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '13px', fontWeight: 700 }}>By {o.cashier}</div>
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{formatTime(o.timestamp)}</div>
                 </div>
