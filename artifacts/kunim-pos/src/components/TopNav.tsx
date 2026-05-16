@@ -1,5 +1,6 @@
 import { useApp } from '../contexts/AppContext';
 import { Screen } from '../lib/types';
+import logo from '../assets/kunim-logo.png';
 
 interface Props {
   activeTab?: 'pos' | 'orders' | 'reports';
@@ -30,7 +31,10 @@ export default function TopNav({ activeTab, isAdmin, onEndShift }: Props) {
   if (isAdmin) {
     return (
       <div style={{ background: 'var(--bg2)', borderBottom: '1px solid var(--border)', padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '56px', flexShrink: 0 }}>
-        <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '15px', color: 'var(--red)' }}>Admin Panel</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <img src={logo} alt="Kunim" style={{ height: '38px', width: '38px', objectFit: 'cover', borderRadius: '50%', background: '#fff', padding: '2px' }} />
+          <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '15px', color: 'var(--red)' }}>Admin Panel</div>
+        </div>
         <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Kunim Bar</div>
         <button onClick={logout} style={{ background: 'rgba(224,16,16,.1)', border: '1px solid rgba(224,16,16,.2)', borderRadius: '8px', padding: '5px 11px', fontSize: '12px', color: 'var(--red)', fontWeight: 700, cursor: 'pointer' }}>Exit</button>
       </div>
@@ -39,8 +43,11 @@ export default function TopNav({ activeTab, isAdmin, onEndShift }: Props) {
 
   return (
     <div style={{ background: 'var(--bg2)', borderBottom: '1px solid var(--border)', padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '56px', flexShrink: 0 }}>
-      <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '15px', color: 'var(--gold)' }}>
-        Kunim Bar <small style={{ color: 'var(--text3)', fontWeight: 400, fontSize: '11px', marginLeft: '6px' }}>POS</small>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <img src={logo} alt="Kunim" style={{ height: '38px', width: '38px', objectFit: 'cover', borderRadius: '50%', background: '#fff', padding: '2px' }} />
+        <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '15px', color: 'var(--gold)' }}>
+          Kunim Bar <small style={{ color: 'var(--text3)', fontWeight: 400, fontSize: '11px', marginLeft: '6px' }}>POS</small>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: '2px' }}>
