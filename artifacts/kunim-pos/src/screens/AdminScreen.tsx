@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useApp } from '../contexts/AppContext';
@@ -230,6 +230,25 @@ function printAdminReport(
 export default function AdminScreen() {
   const { menuItems, setMenuItems, cashiers, setCashiers, categories, setCategories, adminCreds, setAdminCreds, notifSettings, setNotifSettings } = useApp();
   const [tab, setTab] = useState<AdminTab>('dashboard');
+  const [devUnlocked, setDevUnlocked] = useState(false);
+  const devTapsRef = useRef<{ count: number; lastTap: number }>({ count: 0, lastTap: 0 });
+  function handleSecretTap() {
+    const now = Date.now();
+    const t = devTapsRef.current;
+    if (now - t.lastTap > 1500) t.count = 0;
+    t.count += 1;
+    t.lastTap = now;
+    if (t.count >= 7) {
+      t.count = 0;
+      const code = prompt('Developer code:');
+      if (code === 'kunim2026') {
+        setDevUnlocked(true);
+        alert('🔓 Developer mode unlocked. Danger Zone is now visible.');
+      } else if (code !== null) {
+        alert('Wrong code.');
+      }
+    }
+  }
 
   const [editItem, setEditItem] = useState<MenuItem | null | undefined>(undefined);
   const [editCashier, setEditCashier] = useState<Cashier | null | undefined>(undefined);
@@ -877,7 +896,7 @@ export default function AdminScreen() {
         {/* ACCOUNT */}
         {tab === 'account' && (
           <>
-            <div style={{ fontFamily: 'Syne', fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>My Account</div>
+            <div onClick={handleSecretTap} style={{ fontFamily: 'Syne', fontSize: '18px', fontWeight: 700, marginBottom: '16px', cursor: 'default', userSelect: 'none' }}>My Account</div>
             <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px', maxWidth: '400px' }}>
               <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>Admin Username</label>
@@ -951,8 +970,9 @@ export default function AdminScreen() {
               </button>
             </div>
 
+            {devUnlocked && (
             <div style={{ background: 'var(--bg2)', border: '1px solid rgba(224,16,16,.3)', borderRadius: '16px', padding: '20px', maxWidth: '400px', marginTop: '16px' }}>
-              <div style={{ fontFamily: 'Syne', fontSize: '15px', fontWeight: 700, marginBottom: '4px', color: 'var(--red)' }}>⚠️ Danger Zone</div>
+              <div style={{ fontFamily: 'Syne', fontSize: '15px', fontWeight: 700, marginBottom: '4px', color: 'var(--red)' }}>⚠️ Danger Zone (Developer)</div>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '14px', lineHeight: '1.7' }}>
                 Permanently delete all orders/transactions from the system. Menu items, cashiers, stock levels, and settings will <strong>not</strong> be affected. Use this before handing the system over to the owner so they start with a clean slate.
               </div>
@@ -960,6 +980,7 @@ export default function AdminScreen() {
                 Clear All Transactions
               </button>
             </div>
+            )}
           </>
         )}
       </div>
