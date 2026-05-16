@@ -29,21 +29,21 @@ export default function ShiftSummaryModal({ cashierName, shiftStart, orders, onC
   }
 
   function printSummary() {
-    const win = window.open('', '_blank', 'width=420,height=720,toolbar=0,scrollbars=0,status=0');
-    if (!win) { alert('Pop-up blocked — please allow pop-ups and try again.'); return; }
-
     const itemRows = topItems.map(([name, qty]) => `<tr><td>${name}</td><td style="text-align:right">${qty}</td></tr>`).join('');
     const payRows = Object.entries(byPay).filter(([, v]) => v > 0).map(([k, v]) =>
       `<tr><td>${k}</td><td style="text-align:right">GH&#8373; ${v.toFixed(2)}</td></tr>`).join('');
 
-    win.document.write(`<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Shift Summary — ${cashierName}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shift Summary</title>
   <style>
+    @page { size: 72mm auto; margin: 0; }
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family: 'Courier New', Courier, monospace; font-size: 12px; width: 72mm; padding: 4mm 3mm; color: #000; background: #fff; }
+    html, body { background:#fff; color:#000; }
+    body { font-family: 'Courier New', Courier, monospace; font-size: 12px; width: 72mm; padding: 4mm 3mm; }
     .center { text-align:center; }
     .bold { font-weight:bold; }
     .big { font-size:15px; }
@@ -84,12 +84,38 @@ export default function ShiftSummaryModal({ cashierName, shiftStart, orders, onC
   <table>${itemRows}</table>` : ''}
   <div class="dashed"></div>
   <div class="center" style="font-size:10px;color:#666">End of shift report<br>Thank you, ${cashierName}!</div>
-  <script>
-    window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 1000); };
-  <\/script>
 </body>
-</html>`);
-    win.document.close();
+</html>`;
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(iframe);
+
+    const cleanup = () => { try { document.body.removeChild(iframe); } catch {} };
+
+    iframe.onload = () => {
+      try {
+        const w = iframe.contentWindow;
+        if (!w) { cleanup(); return; }
+        w.focus();
+        w.print();
+        setTimeout(cleanup, 2000);
+      } catch {
+        cleanup();
+      }
+    };
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) { cleanup(); alert('Unable to open summary for printing.'); return; }
+    doc.open();
+    doc.write(html);
+    doc.close();
   }
 
   const statCard = (label: string, value: string, sub?: string) => (
