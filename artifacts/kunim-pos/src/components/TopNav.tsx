@@ -57,7 +57,7 @@ export default function TopNav({ activeTab, isAdmin, onEndShift }: Props) {
         )}
         {onEndShift && (
           <button onClick={onEndShift}
-            title="View shift summary & end shift"
+            title="View shift summary & sign out"
             style={{ position: 'relative', background: 'rgba(224,16,16,.1)', border: '1px solid rgba(224,16,16,.2)', borderRadius: '8px', padding: '5px 11px', fontSize: '12px', color: 'var(--red)', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
             End Shift
             {shiftOrders.length > 0 && (
@@ -67,7 +67,6 @@ export default function TopNav({ activeTab, isAdmin, onEndShift }: Props) {
             )}
           </button>
         )}
-        <button onClick={logout} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '5px 11px', fontSize: '12px', color: 'var(--text2)', fontWeight: 700, cursor: 'pointer' }}>Sign Out</button>
       </div>
     </div>
   );
