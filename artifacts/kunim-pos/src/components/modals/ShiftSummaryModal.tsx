@@ -167,7 +167,7 @@ export default function ShiftSummaryModal({ cashierName, shiftStart, orders, onC
           </button>
           <button onClick={onEndShift}
             style={{ flex: 1, background: 'var(--red)', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontFamily: 'Syne', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>
-            End Shift
+            End Shift & Sign Out
           </button>
         </div>
       </div>
