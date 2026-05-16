@@ -8,7 +8,7 @@ import CashierModal from '../components/modals/CashierModal';
 import CategoryModal from '../components/modals/CategoryModal';
 import RestockModal from '../components/modals/RestockModal';
 import { MenuItem, Cashier, Category, Order } from '../lib/types';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid, LabelList } from 'recharts';
 
 type AdminTab = 'dashboard' | 'menu' | 'stock' | 'categories' | 'cashiers' | 'reports' | 'transactions' | 'account';
 type ReportPeriod = 'today' | 'week' | 'month' | 'year';
@@ -605,15 +605,23 @@ export default function AdminScreen() {
             </div>
             <div style={cardStyle}>
               <div style={{ fontFamily: 'Syne', fontSize: '14px', fontWeight: 700, marginBottom: '14px' }}>This Week — Daily Revenue (GH₵)</div>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={weekData} margin={{ top: 10, right: 16, left: 4, bottom: 4 }} barCategoryGap="28%">
-                  <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} dy={4} />
-                  <YAxis tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} width={56} tickFormatter={(v) => `GH₵${v}`} />
-                  <Tooltip cursor={{ fill: 'rgba(224,16,16,0.08)' }} contentStyle={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)' }} formatter={(v: number) => [`GH₵${v.toFixed(2)}`, 'Revenue']} />
-                  <Bar dataKey="revenue" fill="#E01010" radius={[8, 8, 0, 0]} maxBarSize={48} />
-                </BarChart>
-              </ResponsiveContainer>
+              {(() => {
+                const maxRev = Math.max(...weekData.map((d: any) => d.revenue));
+                return (
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={weekData} margin={{ top: 24, right: 20, left: 4, bottom: 4 }} barCategoryGap="55%">
+                    <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} dy={4} interval={0} />
+                    <YAxis tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} width={60} tickFormatter={(v) => `GH₵${v}`} />
+                    <Tooltip cursor={{ fill: 'rgba(224,16,16,0.08)' }} contentStyle={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)' }} formatter={(v: number) => [`GH₵${v.toFixed(2)}`, 'Revenue']} />
+                    <Bar dataKey="revenue" radius={[8, 8, 0, 0]} maxBarSize={42}>
+                      {weekData.map((d: any, i: number) => <Cell key={i} fill={d.revenue === maxRev && maxRev > 0 ? '#E01010' : 'rgba(224,16,16,0.30)'} />)}
+                      <LabelList dataKey="revenue" position="top" fill="var(--text2)" fontSize={11} fontWeight={700} formatter={(v: number) => v > 0 ? `GH₵${v.toFixed(0)}` : ''} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                );
+              })()}
             </div>
           </>
         )}
@@ -782,17 +790,23 @@ export default function AdminScreen() {
 
                 <div style={cardStyle}>
                   <div style={{ fontFamily: 'Syne', fontSize: '14px', fontWeight: 700, marginBottom: '14px' }}>Revenue Over Time (GH₵)</div>
-                  {repBarData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={240}>
-                      <BarChart data={repBarData} margin={{ top: 10, right: 16, left: 4, bottom: 4 }} barCategoryGap="28%">
+                  {repBarData.length > 0 ? (() => {
+                    const maxRev = Math.max(...repBarData.map((d: any) => d.revenue));
+                    return (
+                    <ResponsiveContainer width="100%" height={260}>
+                      <BarChart data={repBarData} margin={{ top: 24, right: 20, left: 4, bottom: 4 }} barCategoryGap="55%">
                         <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                        <XAxis dataKey="date" tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} dy={4} />
-                        <YAxis tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} width={56} tickFormatter={(v) => `GH₵${v}`} />
+                        <XAxis dataKey="date" tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} dy={4} interval={0} />
+                        <YAxis tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} width={60} tickFormatter={(v) => `GH₵${v}`} />
                         <Tooltip cursor={{ fill: 'rgba(240,192,64,0.08)' }} contentStyle={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)' }} formatter={(v: number) => [`GH₵${v.toFixed(2)}`, 'Revenue']} />
-                        <Bar dataKey="revenue" fill="#f0c040" radius={[8, 8, 0, 0]} maxBarSize={48} />
+                        <Bar dataKey="revenue" radius={[8, 8, 0, 0]} maxBarSize={42}>
+                          {repBarData.map((d: any, i: number) => <Cell key={i} fill={d.revenue === maxRev ? '#f0c040' : 'rgba(240,192,64,0.32)'} />)}
+                          <LabelList dataKey="revenue" position="top" fill="var(--text2)" fontSize={11} fontWeight={700} formatter={(v: number) => `GH₵${v.toFixed(0)}`} />
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
-                  ) : <div style={{ color: 'var(--text3)', fontSize: '13px' }}>No data for this period</div>}
+                    );
+                  })() : <div style={{ color: 'var(--text3)', fontSize: '13px' }}>No data for this period</div>}
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
