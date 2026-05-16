@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useApp } from '../contexts/AppContext';
 import TopNav from '../components/TopNav';
@@ -375,6 +375,24 @@ export default function AdminScreen() {
     await setNotifSettings({ smsPhone, lowStockThreshold, reportTime });
     setAccMsg('SMS settings saved.');
     setTimeout(() => setAccMsg(''), 3000);
+  }
+
+  async function resetAllStock() {
+    const confirmed = confirm('⚠️ This will set the stock of EVERY menu item to ZERO.\n\nUse this when handing the system to the owner so they can input fresh stock counts. Continue?');
+    if (!confirmed) return;
+    const doubleConfirm = prompt('Type "ZERO" (uppercase) to confirm:');
+    if (doubleConfirm !== 'ZERO') { alert('Cancelled — text did not match.'); return; }
+    setAccMsg('Resetting stock to zero...');
+    try {
+      await Promise.all(menuItems.map(m => updateDoc(doc(db, 'menu', m.id), { stock: 0 })));
+      setMenuItems(menuItems.map(m => ({ ...m, stock: 0 })));
+      setAccMsg(`✅ Reset stock on ${menuItems.length} item(s) to zero.`);
+      setTimeout(() => setAccMsg(''), 6000);
+    } catch (e) {
+      console.error(e);
+      setAccMsg('❌ Failed to reset stock. Check console.');
+      setTimeout(() => setAccMsg(''), 6000);
+    }
   }
 
   async function resetAllTransactions() {
@@ -967,8 +985,11 @@ export default function AdminScreen() {
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '14px', lineHeight: '1.7' }}>
                 Permanently delete all orders/transactions from the system. Menu items, cashiers, stock levels, and settings will <strong>not</strong> be affected. Use this before handing the system over to the owner so they start with a clean slate.
               </div>
-              <button onClick={resetAllTransactions} style={{ width: '100%', background: 'var(--red)', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontFamily: 'Syne', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>
+              <button onClick={resetAllTransactions} style={{ width: '100%', background: 'var(--red)', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontFamily: 'Syne', fontSize: '14px', fontWeight: 800, cursor: 'pointer', marginBottom: '10px' }}>
                 Clear All Transactions
+              </button>
+              <button onClick={resetAllStock} style={{ width: '100%', background: 'transparent', color: 'var(--red)', border: '1px solid var(--red)', borderRadius: '10px', padding: '12px', fontFamily: 'Syne', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>
+                Reset All Stock to Zero
               </button>
             </div>
             )}
