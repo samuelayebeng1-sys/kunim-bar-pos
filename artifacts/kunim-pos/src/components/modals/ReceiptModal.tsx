@@ -9,23 +9,23 @@ export default function ReceiptModal({ order, onClose }: Props) {
   const now = new Date();
 
   function printReceipt() {
-    const win = window.open('', '_blank', 'width=420,height=680,toolbar=0,scrollbars=0,status=0');
-    if (!win) { alert('Pop-up blocked — please allow pop-ups for this site and try again.'); return; }
-
     const rows = order.items.map(i => `
       <tr>
         <td style="padding:2px 0">${i.name} x${i.qty}</td>
         <td style="padding:2px 0;text-align:right">GH&#8373; ${(i.price * i.qty).toFixed(2)}</td>
       </tr>`).join('');
 
-    win.document.write(`<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Receipt — Kunim Guest House Bar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Receipt</title>
   <style>
+    @page { size: 72mm auto; margin: 0; }
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family: 'Courier New', Courier, monospace; font-size: 12px; width: 72mm; padding: 4mm 3mm; color: #000; background: #fff; }
+    html, body { background:#fff; color:#000; }
+    body { font-family: 'Courier New', Courier, monospace; font-size: 12px; width: 72mm; padding: 4mm 3mm; }
     .center { text-align: center; }
     .bold { font-weight: bold; }
     .big { font-size: 15px; }
@@ -61,12 +61,38 @@ export default function ReceiptModal({ order, onClose }: Props) {
     <div>Thank you for visiting!</div>
     <div>Come again soon &#9829;</div>
   </div>
-  <script>
-    window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 1000); };
-  <\/script>
 </body>
-</html>`);
-    win.document.close();
+</html>`;
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(iframe);
+
+    const cleanup = () => { try { document.body.removeChild(iframe); } catch {} };
+
+    iframe.onload = () => {
+      try {
+        const win = iframe.contentWindow;
+        if (!win) { cleanup(); return; }
+        win.focus();
+        win.print();
+        setTimeout(cleanup, 2000);
+      } catch {
+        cleanup();
+      }
+    };
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) { cleanup(); alert('Unable to open receipt for printing.'); return; }
+    doc.open();
+    doc.write(html);
+    doc.close();
   }
 
   return (
