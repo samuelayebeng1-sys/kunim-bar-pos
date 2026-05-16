@@ -367,6 +367,24 @@ export default function AdminScreen() {
     setTimeout(() => setAccMsg(''), 3000);
   }
 
+  async function resetAllTransactions() {
+    const confirmed = confirm('⚠️ This will PERMANENTLY DELETE all orders/transactions from the system.\n\nMenu items, cashiers, and settings will NOT be touched.\n\nUse this before handing the system over to the owner. Continue?');
+    if (!confirmed) return;
+    const doubleConfirm = prompt('Type "RESET" (uppercase) to confirm:');
+    if (doubleConfirm !== 'RESET') { alert('Cancelled — text did not match.'); return; }
+    setAccMsg('Deleting all transactions...');
+    try {
+      const snap = await getDocs(collection(db, 'orders'));
+      await Promise.all(snap.docs.map(d => deleteDoc(doc(db, 'orders', d.id))));
+      setAccMsg(`✅ Deleted ${snap.docs.length} transaction(s). System is fresh.`);
+      setTimeout(() => setAccMsg(''), 6000);
+    } catch (e) {
+      console.error(e);
+      setAccMsg('❌ Failed to clear transactions. Check console.');
+      setTimeout(() => setAccMsg(''), 6000);
+    }
+  }
+
   async function delItem(id: string) {
     if (!confirm('Delete this item?')) return;
     await deleteDoc(doc(db, 'menu', id));
@@ -930,6 +948,16 @@ export default function AdminScreen() {
               </div>
               <button onClick={saveNotifSettings} style={{ width: '100%', background: 'var(--gold)', color: 'var(--bg)', border: 'none', borderRadius: '10px', padding: '12px', fontFamily: 'Syne', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>
                 Save SMS Settings
+              </button>
+            </div>
+
+            <div style={{ background: 'var(--bg2)', border: '1px solid rgba(224,16,16,.3)', borderRadius: '16px', padding: '20px', maxWidth: '400px', marginTop: '16px' }}>
+              <div style={{ fontFamily: 'Syne', fontSize: '15px', fontWeight: 700, marginBottom: '4px', color: 'var(--red)' }}>⚠️ Danger Zone</div>
+              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '14px', lineHeight: '1.7' }}>
+                Permanently delete all orders/transactions from the system. Menu items, cashiers, stock levels, and settings will <strong>not</strong> be affected. Use this before handing the system over to the owner so they start with a clean slate.
+              </div>
+              <button onClick={resetAllTransactions} style={{ width: '100%', background: 'var(--red)', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontFamily: 'Syne', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>
+                Clear All Transactions
               </button>
             </div>
           </>
