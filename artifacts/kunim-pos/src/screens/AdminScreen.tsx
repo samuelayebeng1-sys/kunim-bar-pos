@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useApp } from '../contexts/AppContext';
@@ -231,22 +231,13 @@ export default function AdminScreen() {
   const { menuItems, setMenuItems, cashiers, setCashiers, categories, setCategories, adminCreds, setAdminCreds, notifSettings, setNotifSettings } = useApp();
   const [tab, setTab] = useState<AdminTab>('dashboard');
   const [devUnlocked, setDevUnlocked] = useState(false);
-  const devTapsRef = useRef<{ count: number; lastTap: number }>({ count: 0, lastTap: 0 });
   function handleSecretTap() {
-    const now = Date.now();
-    const t = devTapsRef.current;
-    if (now - t.lastTap > 1500) t.count = 0;
-    t.count += 1;
-    t.lastTap = now;
-    if (t.count >= 7) {
-      t.count = 0;
-      const code = prompt('Developer code:');
-      if (code === 'kunim2026') {
-        setDevUnlocked(true);
-        alert('🔓 Developer mode unlocked. Danger Zone is now visible.');
-      } else if (code !== null) {
-        alert('Wrong code.');
-      }
+    if (devUnlocked) { setDevUnlocked(false); return; }
+    const code = prompt('Developer code:');
+    if (code === 'kunim2026') {
+      setDevUnlocked(true);
+    } else if (code !== null && code !== '') {
+      alert('Invalid.');
     }
   }
 
@@ -896,7 +887,7 @@ export default function AdminScreen() {
         {/* ACCOUNT */}
         {tab === 'account' && (
           <>
-            <div onClick={handleSecretTap} style={{ fontFamily: 'Syne', fontSize: '18px', fontWeight: 700, marginBottom: '16px', cursor: 'default', userSelect: 'none' }}>My Account</div>
+            <div style={{ fontFamily: 'Syne', fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>My Account</div>
             <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px', maxWidth: '400px' }}>
               <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>Admin Username</label>
@@ -981,6 +972,12 @@ export default function AdminScreen() {
               </button>
             </div>
             )}
+
+            <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '10px', color: 'var(--text3)', opacity: 0.5, userSelect: 'none' }}>
+              <span onClick={handleSecretTap} style={{ cursor: 'default' }}>
+                Powered by ChalePay · v1.0.0{devUnlocked ? ' ·' : ''}
+              </span>
+            </div>
           </>
         )}
       </div>
