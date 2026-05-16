@@ -35,24 +35,27 @@ export default function LoginScreen() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
-      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '20px', padding: '20px 22px', width: '100%', maxWidth: '400px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '14px' }}>
-          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '17px', fontWeight: 800, color: 'var(--gold)', marginBottom: '8px' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '24px', padding: '36px', width: '100%', maxWidth: '420px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '19px', fontWeight: 800, color: 'var(--gold)', marginBottom: '14px' }}>
             Kunim Guest House Bar
           </div>
-          <div style={{ width: '78px', height: '78px', borderRadius: '50%', background: '#fff', overflow: 'hidden', margin: '0 auto 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(240,192,64,.22)' }}>
+          <div style={{ width: '130px', height: '130px', borderRadius: '50%', background: '#fff', overflow: 'hidden', margin: '0 auto 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 22px rgba(240,192,64,.22)' }}>
             <img src={logo} alt="Kunim Guest House" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.85)' }} />
           </div>
-          <div style={{ fontSize: '10px', color: 'var(--text3)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text3)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
             Powered by <span style={{ color: 'var(--red)', fontWeight: 700 }}>ChalePay</span>
           </div>
         </div>
 
+        <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: '21px', fontWeight: 700, marginBottom: '4px' }}>Welcome Back</h2>
+        <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '22px' }}>Select your name then enter your PIN</p>
+
         {loading ? (
-          <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '14px 0', fontSize: '13px' }}>Loading staff...</div>
+          <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '24px 0' }}>Loading staff...</div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '20px' }}>
             {cashiers.map(c => (
               <button
                 key={c.id}
@@ -60,33 +63,34 @@ export default function LoginScreen() {
                 style={{
                   background: selectedCashier?.id === c.id ? 'rgba(240,192,64,0.08)' : 'var(--bg3)',
                   border: `1.5px solid ${selectedCashier?.id === c.id ? 'var(--gold)' : 'var(--border)'}`,
-                  borderRadius: '12px', padding: '8px 6px', textAlign: 'center', cursor: 'pointer', transition: 'all .2s'
+                  borderRadius: '14px', padding: '14px 8px', textAlign: 'center', cursor: 'pointer', transition: 'all .2s'
                 }}
               >
                 {c.photo ? (
-                  <img src={c.photo} alt={c.name} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', margin: '0 auto 5px', display: 'block', border: '2px solid var(--border)' }} />
+                  <img src={c.photo} alt={c.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', margin: '0 auto 8px', display: 'block', border: '2px solid var(--border)' }} />
                 ) : (
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--gold)', color: 'var(--bg)', fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 5px' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--gold)', color: 'var(--bg)', fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}>
                     {c.name[0]}
                   </div>
                 )}
-                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '11px', fontWeight: 700, color: 'var(--text)' }}>{c.name}</div>
+                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '12px', fontWeight: 700, color: 'var(--text)' }}>{c.name}</div>
               </button>
             ))}
           </div>
         )}
 
+        <p style={{ fontSize: '13px', color: 'var(--text2)', fontWeight: 600, marginBottom: '7px' }}>Enter PIN</p>
         <div style={{ position: 'relative' }}>
           <input
             type={showPin ? 'text' : 'password'}
             value={pin}
             onChange={e => setPin(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && doLogin()}
-            placeholder="Enter PIN"
+            placeholder="• • • •"
             maxLength={6}
             style={{
-              width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px',
-              padding: '10px 44px 10px 14px', color: 'var(--text)', fontSize: '18px', letterSpacing: showPin ? '0.1em' : '0.35em',
+              width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '12px',
+              padding: '13px 48px 13px 16px', color: 'var(--text)', fontSize: '22px', letterSpacing: showPin ? '0.1em' : '0.4em',
               outline: 'none', textAlign: 'center', transition: 'border-color .2s', boxSizing: 'border-box'
             }}
             onFocus={e => e.currentTarget.style.borderColor = 'var(--gold)'}
@@ -95,7 +99,7 @@ export default function LoginScreen() {
           <button
             type="button"
             onClick={() => setShowPin(v => !v)}
-            style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: '4px', display: 'flex', alignItems: 'center' }}
+            style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: '4px', display: 'flex', alignItems: 'center' }}
           >
             <EyeIcon open={showPin} />
           </button>
@@ -103,8 +107,8 @@ export default function LoginScreen() {
         <button
           onClick={doLogin}
           style={{
-            width: '100%', background: 'var(--gold)', color: 'var(--bg)', border: 'none', borderRadius: '10px',
-            padding: '11px', fontFamily: 'Syne, sans-serif', fontSize: '14px', fontWeight: 800, marginTop: '10px', transition: 'all .2s', cursor: 'pointer'
+            width: '100%', background: 'var(--gold)', color: 'var(--bg)', border: 'none', borderRadius: '12px',
+            padding: '14px', fontFamily: 'Syne, sans-serif', fontSize: '15px', fontWeight: 800, marginTop: '14px', transition: 'all .2s', cursor: 'pointer'
           }}
           onMouseEnter={e => e.currentTarget.style.background = 'var(--gold-dark)'}
           onMouseLeave={e => e.currentTarget.style.background = 'var(--gold)'}
@@ -113,14 +117,14 @@ export default function LoginScreen() {
         </button>
 
         {error && (
-          <div style={{ background: 'rgba(224,16,16,.1)', border: '1px solid rgba(224,16,16,.3)', borderRadius: '8px', padding: '7px 12px', fontSize: '12px', color: '#ff6b6b', marginTop: '8px', textAlign: 'center' }}>
+          <div style={{ background: 'rgba(224,16,16,.1)', border: '1px solid rgba(224,16,16,.3)', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', color: '#ff6b6b', marginTop: '12px', textAlign: 'center' }}>
             {error}
           </div>
         )}
 
         <div
           onClick={() => setShowAdmin(true)}
-          style={{ textAlign: 'center', marginTop: '10px', fontSize: '12px', color: 'var(--text3)', cursor: 'pointer', padding: '4px', transition: 'color .2s' }}
+          style={{ textAlign: 'center', marginTop: '18px', fontSize: '13px', color: 'var(--text3)', cursor: 'pointer', padding: '6px', transition: 'color .2s' }}
           onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
           onMouseLeave={e => e.currentTarget.style.color = 'var(--text3)'}
         >
