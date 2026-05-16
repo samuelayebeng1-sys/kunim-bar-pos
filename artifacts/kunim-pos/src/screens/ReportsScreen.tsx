@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import TopNav from '../components/TopNav';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid } from 'recharts';
 import { Order } from '../lib/types';
 
 interface Props {
@@ -85,12 +85,13 @@ export default function ReportsScreen({ onEndShift }: Props) {
             <div style={cardStyle}>
               <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '14px', fontWeight: 700, marginBottom: '14px' }}>Daily Revenue (GH₵)</div>
               {barData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={barData}>
-                    <XAxis dataKey="date" tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)' }} />
-                    <Bar dataKey="revenue" fill="rgba(240,192,64,.7)" stroke="#f0c040" strokeWidth={2} radius={[6, 6, 0, 0]} />
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={barData} margin={{ top: 10, right: 16, left: 4, bottom: 4 }} barCategoryGap="28%">
+                    <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} dy={4} />
+                    <YAxis tick={{ fill: '#999', fontSize: 11 }} axisLine={false} tickLine={false} width={56} tickFormatter={(v) => `GH₵${v}`} />
+                    <Tooltip cursor={{ fill: 'rgba(240,192,64,0.08)' }} contentStyle={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)' }} formatter={(v: number) => [`GH₵${v.toFixed(2)}`, 'Revenue']} />
+                    <Bar dataKey="revenue" fill="#f0c040" radius={[8, 8, 0, 0]} maxBarSize={48} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : <div style={{ color: 'var(--text3)', fontSize: '13px' }}>No data for this period</div>}
