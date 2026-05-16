@@ -38,9 +38,11 @@ export default function LoginScreen() {
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '24px', padding: '36px', width: '100%', maxWidth: '420px' }}>
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <img src={logo} alt="Kunim Guest House" style={{ height: '96px', width: '96px', objectFit: 'cover', borderRadius: '50%', marginBottom: '14px', background: '#fff', padding: '6px', boxShadow: '0 4px 18px rgba(240,192,64,.18)' }} />
-          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '19px', fontWeight: 800, color: 'var(--gold)', marginBottom: '4px' }}>
+          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '19px', fontWeight: 800, color: 'var(--gold)', marginBottom: '14px' }}>
             Kunim Guest House Bar
+          </div>
+          <div style={{ width: '130px', height: '130px', borderRadius: '50%', background: '#fff', overflow: 'hidden', margin: '0 auto 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 22px rgba(240,192,64,.22)' }}>
+            <img src={logo} alt="Kunim Guest House" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.85)' }} />
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text3)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
             Powered by <span style={{ color: 'var(--red)', fontWeight: 700 }}>ChalePay</span>
