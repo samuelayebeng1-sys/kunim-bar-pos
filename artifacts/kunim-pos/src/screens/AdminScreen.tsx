@@ -228,7 +228,7 @@ function printAdminReport(
 }
 
 export default function AdminScreen() {
-  const { menuItems, setMenuItems, cashiers, setCashiers, categories, setCategories, adminCreds, setAdminCreds, notifSettings, setNotifSettings } = useApp();
+  const { menuItems, setMenuItems, cashiers, setCashiers, categories, setCategories, adminCreds, saveAdminCreds, notifSettings, setNotifSettings } = useApp();
   const [tab, setTab] = useState<AdminTab>('dashboard');
   const [devUnlocked, setDevUnlocked] = useState(false);
   function handleSecretTap() {
@@ -263,6 +263,10 @@ export default function AdminScreen() {
   const [showNewPass, setShowNewPass] = useState(false);
   const [confPass, setConfPass] = useState('');
   const [showConfPass, setShowConfPass] = useState(false);
+
+  useEffect(() => {
+    setNewUser(adminCreds.u);
+  }, [adminCreds.u]);
   const [accMsg, setAccMsg] = useState('');
   const [smsPhone, setSmsPhone] = useState(notifSettings.smsPhone);
   const [lowStockThreshold, setLowStockThreshold] = useState(notifSettings.lowStockThreshold ?? 5);
@@ -433,10 +437,14 @@ export default function AdminScreen() {
     setCategories(categories.filter(c => c.id !== cat.id));
   }
 
-  function saveAccount() {
+  async function saveAccount() {
+    if (!newUser.trim()) { alert('Username cannot be empty.'); return; }
     if (newPass && newPass !== confPass) { alert('Passwords do not match.'); return; }
-    setAdminCreds({ u: newUser || adminCreds.u, p: newPass || adminCreds.p });
-    setAccMsg('Changes saved.');
+    if (!newPass) { alert('Please enter a new password.'); return; }
+    await saveAdminCreds(newUser.trim(), newPass);
+    setNewPass('');
+    setConfPass('');
+    setAccMsg('Credentials saved and secured.');
     setTimeout(() => setAccMsg(''), 3000);
   }
 

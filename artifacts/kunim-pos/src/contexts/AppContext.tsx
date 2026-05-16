@@ -4,6 +4,7 @@ import {
   doc, query, orderBy, serverTimestamp, setDoc, getDoc, where
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { hashPassword } from '../lib/crypto';
 import { Cashier, Category, MenuItem, CartItem, Order, Screen, PaymentMethod, NotificationSettings } from '../lib/types';
 
 const DEFAULT_CATS = ['Alcoholic Drinks', 'Soft Drinks', 'Water & Juice', 'Cocktails & Mixers'];
@@ -60,7 +61,7 @@ interface AppContextType {
   isAdmin: boolean;
   setIsAdmin: (v: boolean) => void;
   adminCreds: { u: string; p: string };
-  setAdminCreds: (c: { u: string; p: string }) => void;
+  saveAdminCreds: (u: string, p: string) => Promise<void>;
   cashiers: Cashier[];
   setCashiers: (c: Cashier[]) => void;
   categories: Category[];
@@ -89,7 +90,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [screen, setScreen] = useState<Screen>('login');
   const [currentCashier, setCurrentCashier] = useState<Cashier | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [adminCreds, setAdminCreds] = useState({ u: 'admin', p: 'Sjunior03' });
+  const [adminCreds, setAdminCreds] = useState({ u: 'admin', p: '' });
   const [cashiers, setCashiers] = useState<Cashier[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -123,11 +124,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       await seed();
-      const [cSnap, catSnap, mSnap, notifSnap] = await Promise.all([
+      const [cSnap, catSnap, mSnap, notifSnap, adminSnap] = await Promise.all([
         getDocs(query(collection(db, 'cashiers'), orderBy('name'))),
         getDocs(collection(db, 'categories')),
         getDocs(collection(db, 'menu')),
         getDoc(doc(db, 'settings', 'notifications')),
+        getDoc(doc(db, 'settings', 'admin')),
       ]);
       setCashiers(cSnap.docs.map(d => ({ id: d.id, ...d.data() } as Cashier)));
       setCategories(catSnap.docs.map(d => ({ id: d.id, ...d.data() } as Category)));
@@ -141,6 +143,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
         setNotifSettingsState(data);
         notifRef.current = data;
+      }
+      if (adminSnap.exists()) {
+        const data = adminSnap.data() as { u: string; p: string };
+        setAdminCreds({ u: data.u, p: data.p });
+      } else {
+        // First run — no credentials set yet. Mark the document as needing setup.
+        const stub = { u: 'admin', p: '' };
+        await setDoc(doc(db, 'settings', 'admin'), stub);
+        setAdminCreds(stub);
       }
     } catch (e) {
       console.error('Failed to load data', e);
@@ -199,6 +210,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const id = setInterval(tick, 60_000);
     return () => clearInterval(id);
+  }, []);
+
+  const saveAdminCreds = useCallback(async (u: string, p: string) => {
+    const hash = await hashPassword(p);
+    const updated = { u, p: hash };
+    setAdminCreds(updated);
+    await setDoc(doc(db, 'settings', 'admin'), updated);
   }, []);
 
   const addToCart = useCallback((item: MenuItem) => {
@@ -285,7 +303,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       screen, setScreen,
       currentCashier, setCurrentCashier: handleSetCurrentCashier,
       isAdmin, setIsAdmin,
-      adminCreds, setAdminCreds,
+      adminCreds, saveAdminCreds,
       cashiers, setCashiers,
       categories, setCategories,
       menuItems, setMenuItems,
