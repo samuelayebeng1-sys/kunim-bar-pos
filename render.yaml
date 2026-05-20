@@ -2,5 +2,5 @@ services:
   - type: static
     name: kunim-pos-frontend
     rootDir: .
-    buildCommand: npx pnpm@9.0.0 install && npx pnpm@9.0.0 --filter @workspace/kunim-pos run build
-    staticPublishPath: artifacts/kunim-pos/dist
+    buildCommand: npx pnpm@9.0.0 install --no-frozen-lockfile && npx pnpm@9.0.0 --filter @workspace/kunim-pos run build
+    staticPublishPath: artifacts/kunim-pos/dist/public
