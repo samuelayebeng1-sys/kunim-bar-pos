@@ -1,6 +1,6 @@
 services:
   - type: static
     name: kunim-pos-frontend
-    rootDir: artifacts/kunim-pos
-    buildCommand: npx pnpm@9.0.0 install && npx pnpm@9.0.0 run build
-    staticPublishPath: dist
+    rootDir: .
+    buildCommand: npx pnpm@9.0.0 install && npx pnpm@9.0.0 --filter @workspace/kunim-pos run build
+    staticPublishPath: artifacts/kunim-pos/dist
