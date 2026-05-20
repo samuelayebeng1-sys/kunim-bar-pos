@@ -76,5 +76,6 @@
   },
   "dependencies": {
     "firebase": "^12.13.0"
-  }
+  },
+  "packageManager": "pnpm@9.0.0"
 }
