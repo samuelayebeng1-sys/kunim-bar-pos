@@ -1,3 +1,6 @@
+bash
+
+cat > /mnt/user-data/outputs/ReceiptModal.tsx << 'ENDOFFILE'
 import { Order } from '../../lib/types';
 
 interface Props {
@@ -5,445 +8,455 @@ interface Props {
   onClose: () => void;
 }
 
-export default function ReceiptModal({ order, onClose }: Props) {
-  const now = new Date();
+// ─── Constants ───────────────────────────────────────────────────────────────
 
+const LINE_WIDTH = 32;
+const DOTS = '................................';  // 32 chars – prints on all output types
+const DASHES = '--------------------------------';  // 32 chars
+
+// ─── ESC/POS byte constants ──────────────────────────────────────────────────
+
+const ESC = 0x1b;
+const GS  = 0x1d;
+const LF  = 0x0a;
+
+const CMD_INIT         = [ESC, 0x40];
+const CMD_ALIGN_CENTER = [ESC, 0x61, 0x01];
+const CMD_ALIGN_LEFT   = [ESC, 0x61, 0x00];
+const CMD_BOLD_ON      = [ESC, 0x45, 0x01];
+const CMD_BOLD_OFF     = [ESC, 0x45, 0x00];
+const CMD_FONT_SMALL   = [ESC, 0x4d, 0x01];
+const CMD_FONT_NORMAL  = [ESC, 0x4d, 0x00];
+const CMD_DOUBLE_ON    = [GS,  0x21, 0x11];
+const CMD_DOUBLE_OFF   = [GS,  0x21, 0x00];
+const CMD_CUT          = [GS,  0x56, 0x42, 0x00];
+
+// ─── Text helpers ────────────────────────────────────────────────────────────
+
+function centerText(str: string, width = LINE_WIDTH): string {
+  const s = str.substring(0, width);
+  const spaces = Math.max(0, Math.floor((width - s.length) / 2));
+  return ' '.repeat(spaces) + s;
+}
+
+function twoCol(left: string, right: string, width = LINE_WIDTH): string {
+  const maxLeft = width - right.length - 1;
+  const l = left.substring(0, maxLeft).padEnd(maxLeft);
+  return `${l} ${right}`;
+}
+
+function encodeText(str: string): number[] {
+  const bytes: number[] = [];
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    if (c === 0x20b5 || c === 0x00a2) { bytes.push(0x43); } // ₵ → C
+    else if (c < 128) { bytes.push(c); }
+    else { bytes.push(0x3f); } // ? for unmapped
+  }
+  return bytes;
+}
+
+function escLine(text: string): number[] {
+  return [...encodeText(text), LF];
+}
+
+// ─── Platform detection ───────────────────────────────────────────────────────
+
+function isAndroid(): boolean {
+  return /android/i.test(navigator.userAgent);
+}
+
+// ─── ESC/POS receipt builder ─────────────────────────────────────────────────
+
+function buildEscPos(order: Order, now: Date): Uint8Array {
   const dateStr = now.toLocaleDateString('en-GB');
-  const timeStr = now.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
+  const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  const bytes: number[] = [
+    ...CMD_INIT,
+
+    // Header
+    ...CMD_ALIGN_CENTER,
+    ...CMD_BOLD_ON,
+    ...CMD_DOUBLE_ON,
+    ...escLine('Kunim'),
+    ...escLine('Guest House Bar'),
+    ...CMD_DOUBLE_OFF,
+    ...CMD_BOLD_OFF,
+    ...CMD_FONT_SMALL,
+    ...escLine(centerText('Powered by ChalePay')),
+    ...CMD_FONT_NORMAL,
+    ...escLine(centerText(`${dateStr}  ${timeStr}`)),
+    ...escLine(centerText(`Cashier: ${order.cashier}`)),
+
+    ...CMD_ALIGN_LEFT,
+    ...escLine(DOTS),
+
+    // Items
+    ...order.items.flatMap(item => {
+      const name = item.name.substring(0, 20);
+      const qty  = `x${item.qty}`;
+      const amt  = `GHC ${(item.price * item.qty).toFixed(2)}`;
+      return escLine(twoCol(`${name} ${qty}`, amt));
+    }),
+
+    ...escLine(DOTS),
+
+    // Total
+    ...CMD_BOLD_ON,
+    ...escLine(twoCol('TOTAL', `GHC ${order.total.toFixed(2)}`)),
+    ...CMD_BOLD_OFF,
+    ...escLine(twoCol('Payment', order.paymentMethod)),
+
+    ...escLine(DOTS),
+
+    // Footer
+    ...CMD_ALIGN_CENTER,
+    ...CMD_FONT_SMALL,
+    ...escLine(centerText('Thank you for visiting!')),
+    ...escLine(centerText('Come again soon <3')),
+    ...CMD_FONT_NORMAL,
+    [LF, LF, LF],
+
+    ...CMD_CUT,
+  ].flat();
+
+  return new Uint8Array(bytes);
+}
+
+// ─── RawBT deep-link print ───────────────────────────────────────────────────
+
+function printRawBT(order: Order, now: Date): void {
+  const bytes = buildEscPos(order, now);
+  let binary = '';
+  bytes.forEach(b => { binary += String.fromCharCode(b); });
+  const b64 = btoa(binary);
+
+  const url = `rawbt://print?base64=${encodeURIComponent(b64)}`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  try { a.click(); } finally {
+    setTimeout(() => { try { document.body.removeChild(a); } catch { /* gone */ } }, 2000);
+  }
+}
+
+// ─── Build the plain-text receipt body (used for visible print container) ────
+
+function buildPlainTextReceipt(order: Order, now: Date): string {
+  const dateStr = now.toLocaleDateString('en-GB');
+  const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  const lines: string[] = [];
+
+  lines.push(centerText('Kunim Guest House Bar'));
+  lines.push(centerText('Powered by ChalePay'));
+  lines.push(centerText(`${dateStr}  ${timeStr}`));
+  lines.push(centerText(`Cashier: ${order.cashier}`));
+  lines.push(DOTS);
+
+  order.items.forEach(item => {
+    const name = item.name.substring(0, 20);
+    const qty  = `x${item.qty}`;
+    const amt  = `GHC ${(item.price * item.qty).toFixed(2)}`;
+    lines.push(twoCol(`${name} ${qty}`, amt));
   });
 
-  function truncate(str: string, max: number) {
-    return str.length > max ? str.substring(0, max) : str;
+  lines.push(DOTS);
+  lines.push(twoCol('TOTAL', `GHC ${order.total.toFixed(2)}`));
+  lines.push(twoCol('Payment', order.paymentMethod));
+  lines.push(DOTS);
+  lines.push(centerText('Thank you for visiting!'));
+  lines.push(centerText('Come again soon <3'));
+
+  return lines.join('\n');
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function ReceiptModal({ order, onClose }: Props) {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB');
+  const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const android = isAndroid();
+
+  // Inject print styles once into <head> on mount (avoids styled-components dep)
+  if (typeof document !== 'undefined' && !document.getElementById('receipt-print-style')) {
+    const style = document.createElement('style');
+    style.id = 'receipt-print-style';
+    style.textContent = `
+      @page {
+        size: 58mm auto;
+        margin: 0;
+      }
+      @media print {
+        /* Hide everything on the page */
+        body > *,
+        body > * > *,
+        #__next > * {
+          display: none !important;
+        }
+
+        /* Show ONLY the print receipt container */
+        #receipt-print-container {
+          display: block !important;
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 58mm !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #fff !important;
+          color: #000 !important;
+          z-index: 9999999 !important;
+        }
+
+        #receipt-print-container pre {
+          font-family: 'Courier New', Courier, monospace !important;
+          font-size: 10.5px !important;
+          line-height: 1.5 !important;
+          white-space: pre !important;
+          word-break: keep-all !important;
+          overflow: hidden !important;
+          width: 58mm !important;
+          margin: 0 !important;
+          padding: 3mm 2mm !important;
+          background: #fff !important;
+          color: #000 !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
   }
 
-  function buildReceiptHTML(): string {
-    const rows = order.items
-      .map((item) => {
-        const name = truncate(item.name, 16);
-        const amount = `GH₵ ${(item.price * item.qty).toFixed(2)}`;
-
-        return `
-          <tr>
-            <td class="item-name">${name} x${item.qty}</td>
-            <td class="item-amt">${amount}</td>
-          </tr>
-        `;
-      })
-      .join('');
-
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Receipt</title>
-  <style>
-    @page {
-      size: 58mm auto;
-      margin: 0;
+  function handlePrint() {
+    if (android) {
+      // On Android: use RawBT deep link (ESC/POS bytes)
+      printRawBT(order, now);
+    } else {
+      // Desktop: use window.print() — the #receipt-print-container is shown via @media print
+      window.print();
     }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      width: 58mm;
-      background: #ffffff;
-      color: #000000;
-    }
-
-    body {
-      font-family: "Courier New", Courier, monospace;
-      font-size: 11px;
-      line-height: 1.55;
-      padding: 0;
-      margin: 0;
-    }
-
-    .receipt {
-      width: 54mm;
-      padding: 3mm 2mm;
-      margin: 0 auto;
-      background: #ffffff;
-      color: #000000;
-    }
-
-    .center {
-      text-align: center;
-    }
-
-    .business {
-      font-size: 13px;
-      font-weight: bold;
-      letter-spacing: 0.3px;
-    }
-
-    .small {
-      font-size: 9px;
-      color: #555555;
-      margin-top: 1px;
-    }
-
-    .meta {
-      font-size: 10px;
-      margin-top: 2px;
-    }
-
-    .dash {
-      border-top: 1px dashed #000000;
-      margin: 7px 0;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    td {
-      padding: 1px 0;
-      vertical-align: top;
-    }
-
-    .item-name {
-      text-align: left;
-      word-break: break-word;
-      padding-right: 4px;
-    }
-
-    .item-amt {
-      text-align: right;
-      white-space: nowrap;
-    }
-
-    .total td {
-      font-size: 13px;
-      font-weight: bold;
-      padding-top: 4px;
-    }
-
-    .payment td {
-      font-size: 11px;
-      padding-top: 1px;
-    }
-
-    .footer {
-      text-align: center;
-      font-size: 9px;
-      color: #555555;
-      margin-top: 2px;
-    }
-
-    @media print {
-      html,
-      body {
-        width: 58mm !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-
-      .receipt {
-        width: 54mm !important;
-        margin: 0 auto !important;
-        padding: 3mm 2mm !important;
-      }
-
-      * {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="receipt">
-    <div class="center">
-      <div class="business">Kunim Guest House Bar</div>
-      <div class="small">Powered by ChalePay</div>
-      <div class="meta">${dateStr} ${timeStr}</div>
-      <div class="meta">Cashier: <strong>${order.cashier}</strong></div>
-    </div>
-
-    <div class="dash"></div>
-
-    <table>
-      <tbody>
-        ${rows}
-      </tbody>
-    </table>
-
-    <div class="dash"></div>
-
-    <table>
-      <tbody>
-        <tr class="total">
-          <td>TOTAL</td>
-          <td style="text-align:right;">GH₵ ${order.total.toFixed(2)}</td>
-        </tr>
-        <tr class="payment">
-          <td>Payment</td>
-          <td style="text-align:right;">${order.paymentMethod}</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <div class="dash"></div>
-
-    <div class="footer">
-      <div>Thank you for visiting!</div>
-      <div>Come again soon ♥</div>
-    </div>
-  </div>
-</body>
-</html>
-`;
   }
 
-  function printReceipt() {
-    const iframe = document.createElement('iframe');
-
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.visibility = 'hidden';
-    iframe.setAttribute('aria-hidden', 'true');
-
-    document.body.appendChild(iframe);
-
-    const cleanup = () => {
-      try {
-        document.body.removeChild(iframe);
-      } catch {}
-    };
-
-    const doc = iframe.contentDocument || iframe.contentWindow?.document;
-
-    if (!doc) {
-      cleanup();
-      alert('Unable to prepare receipt for printing.');
-      return;
-    }
-
-    doc.open();
-    doc.write(buildReceiptHTML());
-    doc.close();
-
-    iframe.onload = () => {
-      const win = iframe.contentWindow;
-
-      if (!win) {
-        cleanup();
-        return;
-      }
-
-      setTimeout(() => {
-        win.focus();
-        win.print();
-        setTimeout(cleanup, 3000);
-      }, 400);
-    };
+  function handleSaveAsPDF() {
+    // window.print() with "Save as PDF" works cross-platform
+    // On Android Chrome, user selects "Save as PDF" in the print dialog
+    window.print();
   }
 
-  const previewRows = order.items.map((item, index) => (
-    <tr key={index}>
-      <td
-        style={{
-          textAlign: 'left',
-          verticalAlign: 'top',
-          padding: '1px 4px 1px 0',
-          wordBreak: 'break-word',
-        }}
-      >
-        {truncate(item.name, 16)} x{item.qty}
-      </td>
-      <td
-        style={{
-          textAlign: 'right',
-          verticalAlign: 'top',
-          padding: '1px 0',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        GH₵ {(item.price * item.qty).toFixed(2)}
-      </td>
-    </tr>
-  ));
+  // ── Preview card rows ─────────────────────────────────────────────────────
 
-  const receiptStyle: React.CSSProperties = {
-    background: '#ffffff',
-    color: '#000000',
-    fontFamily: '"Courier New", Courier, monospace',
-    fontSize: '11px',
-    lineHeight: '1.55',
-    width: '216px',
-    margin: '0 auto',
-    padding: '12px 8px',
-    borderRadius: '8px',
-  };
-
-  const dashStyle: React.CSSProperties = {
-    borderTop: '1px dashed #000',
-    margin: '7px 0',
-  };
-
-  return (
+  const previewItems = order.items.map((item, i) => (
     <div
+      key={i}
       style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,.85)',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '16px',
+        justifyContent: 'space-between',
+        fontFamily: "'Courier New', Courier, monospace",
+        fontSize: '11px',
+        lineHeight: '1.55',
+        padding: '1px 0',
       }}
     >
+      <span style={{ wordBreak: 'break-word', paddingRight: '6px' }}>
+        {item.name.substring(0, 18)} x{item.qty}
+      </span>
+      <span style={{ whiteSpace: 'nowrap' }}>
+        GH₵ {(item.price * item.qty).toFixed(2)}
+      </span>
+    </div>
+  ));
+
+  const monoStyle: React.CSSProperties = {
+    fontFamily: "'Courier New', Courier, monospace",
+    fontSize: '11px',
+    lineHeight: '1.55',
+  };
+
+  const dotLine: React.CSSProperties = {
+    fontFamily: "'Courier New', Courier, monospace",
+    fontSize: '10px',
+    color: '#888',
+    letterSpacing: '0.5px',
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
+    margin: '5px 0',
+  };
+
+  // ── Plain text for print container ────────────────────────────────────────
+
+  const plainText = buildPlainTextReceipt(order, now);
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <>
+      {/* ── Hidden print-safe container (visible ONLY during print/PDF) ── */}
+      {/*    Positioned off-screen when not printing; @media print reveals it */}
+      <div
+        id="receipt-print-container"
+        style={{ display: 'none' }}
+        aria-hidden="true"
+      >
+        <pre>{plainText}</pre>
+      </div>
+
+      {/* ── Modal overlay ── */}
       <div
         style={{
-          background: 'var(--bg2)',
-          border: '1px solid var(--border)',
-          borderRadius: '20px',
-          padding: '24px',
-          width: '100%',
-          maxWidth: '460px',
-          maxHeight: '92vh',
-          overflowY: 'auto',
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '16px',
         }}
       >
         <div
           style={{
-            fontFamily: 'Syne',
-            fontSize: '18px',
-            fontWeight: 700,
-            marginBottom: '18px',
+            background: 'var(--bg2)',
+            border: '1px solid var(--border)',
+            borderRadius: '20px',
+            padding: '24px',
+            width: '100%',
+            maxWidth: '460px',
+            maxHeight: '92vh',
+            overflowY: 'auto',
           }}
         >
-          Receipt
-        </div>
-
-        <div style={receiptStyle}>
-          <div style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                fontSize: '13px',
-                fontWeight: 'bold',
-                letterSpacing: '0.3px',
-              }}
-            >
-              Kunim Guest House Bar
-            </div>
-            <div style={{ fontSize: '9px', color: '#555', marginTop: '1px' }}>
-              Powered by ChalePay
-            </div>
-            <div style={{ fontSize: '10px', marginTop: '2px' }}>
-              {dateStr} {timeStr}
-            </div>
-            <div style={{ fontSize: '10px' }}>
-              Cashier: <strong>{order.cashier}</strong>
-            </div>
+          {/* Title */}
+          <div style={{ fontFamily: 'Syne', fontSize: '18px', fontWeight: 700, marginBottom: '18px' }}>
+            Receipt
           </div>
 
-          <div style={dashStyle} />
-
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <tbody>{previewRows}</tbody>
-          </table>
-
-          <div style={dashStyle} />
-
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <tbody>
-              <tr>
-                <td
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 'bold',
-                    paddingTop: '4px',
-                  }}
-                >
-                  TOTAL
-                </td>
-                <td
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 'bold',
-                    textAlign: 'right',
-                    paddingTop: '4px',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  GH₵ {order.total.toFixed(2)}
-                </td>
-              </tr>
-              <tr>
-                <td style={{ fontSize: '11px', paddingTop: '1px' }}>
-                  Payment
-                </td>
-                <td
-                  style={{
-                    fontSize: '11px',
-                    textAlign: 'right',
-                    paddingTop: '1px',
-                  }}
-                >
-                  {order.paymentMethod}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div style={dashStyle} />
-
+          {/* ── On-screen preview card ── */}
           <div
             style={{
-              textAlign: 'center',
-              fontSize: '9px',
-              color: '#555',
-              marginTop: '2px',
-            }}
-          >
-            <div>Thank you for visiting!</div>
-            <div>Come again soon ♥</div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
-          <button
-            onClick={printReceipt}
-            style={{
-              flex: 1,
-              background: 'var(--bg3)',
-              color: 'var(--text)',
-              border: '1px solid var(--border)',
+              background: '#fff',
+              color: '#000',
               borderRadius: '10px',
-              padding: '12px',
-              fontFamily: 'Syne',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
+              padding: '12px 10px',
+              width: '224px',
+              margin: '0 auto',
             }}
           >
-            🖨️ Print Receipt
-          </button>
+            {/* Header */}
+            <div style={{ textAlign: 'center', ...monoStyle }}>
+              <div style={{ fontSize: '13px', fontWeight: 'bold', letterSpacing: '.3px' }}>
+                Kunim Guest House Bar
+              </div>
+              <div style={{ fontSize: '9px', color: '#666', marginTop: '1px' }}>
+                Powered by ChalePay
+              </div>
+              <div style={{ fontSize: '10px', marginTop: '2px' }}>
+                {dateStr}  {timeStr}
+              </div>
+              <div style={{ fontSize: '10px' }}>
+                Cashier: <strong>{order.cashier}</strong>
+              </div>
+            </div>
 
+            {/* Separator */}
+            <div style={dotLine}>{DOTS}</div>
+
+            {/* Items */}
+            <div>{previewItems}</div>
+
+            {/* Separator */}
+            <div style={dotLine}>{DOTS}</div>
+
+            {/* Total */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', ...monoStyle, fontWeight: 'bold', fontSize: '13px' }}>
+              <span>TOTAL</span>
+              <span>GH₵ {order.total.toFixed(2)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', ...monoStyle, marginTop: '2px' }}>
+              <span>Payment</span>
+              <span>{order.paymentMethod}</span>
+            </div>
+
+            {/* Separator */}
+            <div style={dotLine}>{DOTS}</div>
+
+            {/* Footer */}
+            <div style={{ textAlign: 'center', fontSize: '9px', color: '#666', ...monoStyle }}>
+              <div>Thank you for visiting!</div>
+              <div>Come again soon ♥</div>
+            </div>
+          </div>
+
+          {/* Android hint */}
+          {android && (
+            <div style={{
+              marginTop: '10px',
+              fontSize: '11px',
+              color: 'var(--text)',
+              opacity: 0.55,
+              textAlign: 'center',
+              fontFamily: 'Syne',
+            }}>
+              RawBT must be installed &amp; Bluetooth printer paired
+            </div>
+          )}
+
+          {/* Buttons */}
+          <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
+            {/* Print / RawBT button */}
+            <button
+              onClick={handlePrint}
+              style={{
+                flex: 1,
+                background: 'var(--bg3)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                padding: '12px',
+                fontFamily: 'Syne',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              {android ? '🖨️ Print via RawBT' : '🖨️ Print Receipt'}
+            </button>
+
+            {/* Save as PDF (both platforms) */}
+            <button
+              onClick={handleSaveAsPDF}
+              style={{
+                flex: 1,
+                background: 'var(--bg3)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                padding: '12px',
+                fontFamily: 'Syne',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              💾 Save as PDF
+            </button>
+          </div>
+
+          {/* New Order */}
           <button
             onClick={onClose}
             style={{
-              flex: 1,
+              width: '100%',
+              marginTop: '10px',
               background: 'var(--gold)',
               color: 'var(--bg)',
               border: 'none',
               borderRadius: '10px',
-              padding: '12px',
+              padding: '13px',
               fontFamily: 'Syne',
               fontSize: '13px',
               fontWeight: 800,
@@ -454,6 +467,6 @@ export default function ReceiptModal({ order, onClose }: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
